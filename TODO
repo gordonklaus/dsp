@@ -1,0 +1,22 @@
+Delay:
+- special builtin
+- one Write, one or more Reads
+- named
+- add Reads from a context menu on the Write node, or by duplicating a Read node
+- Write precedes Read unless otherwise constrained
+  - visually merge Reads that succeed the Write (feedforward) into the Write node
+  - when a Read node precedes a Write, disconnect it from the Write
+- two types (or modes) of Read:  time delay and sample delay
+  - inferred by the type of the delay input:
+    - float: time
+	- int: sample
+	- no input:
+	  - feedback: single sample
+	  - feedforward: zero (pointless)
+- delay input for feedback Read should compensate for extra single sample delay by subtracting one sample period from the delay time before doing the lookup
+
+Variable:
+- much like a single sample delay but for events, not audio
+  - mutiple writes allowed
+  - named
+  - of different types, perhaps? not just numeric
