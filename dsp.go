@@ -63,9 +63,14 @@ func NewNode(o types.Object) *Node {
 	return nil
 }
 
-func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
-	// nodes, nodeNodes := g.cloneNodes()
+func NewArithmeticNode(op string) *Node {
+	n := &Node{Name: op}
+	n.InPorts = []*Port{{Node: n}, {Node: n}}
+	n.OutPorts = []*Port{{Out: true, Node: n}}
+	return n
+}
 
+func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
 	nodeLayers := make(map[*Node]int, len(g.Nodes))
 	firstLayer := 0
 	var assignLayer func(n *Node, layer int)
@@ -234,17 +239,10 @@ perms:
 			}
 		}
 	}
-	println(minCrossings)
 
 	for i, p := range bestPerms {
 		layers[i] = getPerm(layers[i], p)
 	}
-
-	// for _, l := range layers {
-	// 	for i, n := range l {
-	// 		l[i] = nodeNodes[n]
-	// 	}
-	// }
 
 	return layers, fakeConns
 }
@@ -265,61 +263,4 @@ func getPerm(orig []*Node, p []int) []*Node {
 		result[i], result[i+v] = result[i+v], result[i]
 	}
 	return result
-}
-
-func (g *Graph) cloneNodes() ([]*Node, map[*Node]*Node) {
-	nodes := make([]*Node, len(g.Nodes))
-	nodeNodes := make(map[*Node]*Node, len(g.Nodes))
-	portPorts := make(map[*Port]*Port, len(g.Nodes))
-	for i, n := range g.Nodes {
-		nn := n.cloneStart(portPorts)
-		nodes[i] = nn
-		nodeNodes[nn] = n
-	}
-	for i, n := range g.Nodes {
-		nodes[i].cloneFinish(n, nodeNodes, portPorts)
-	}
-	return nodes, nodeNodes
-}
-
-func (n *Node) cloneStart(portPorts map[*Port]*Port) *Node {
-	nn := &Node{
-		InPorts:  make([]*Port, len(n.InPorts)),
-		OutPorts: make([]*Port, len(n.OutPorts)),
-	}
-	for i, p := range n.InPorts {
-		pp := p.cloneStart()
-		nn.InPorts[i] = pp
-		portPorts[p] = pp
-	}
-	for i, p := range n.OutPorts {
-		pp := p.cloneStart()
-		nn.OutPorts[i] = pp
-		portPorts[p] = pp
-	}
-	return nn
-}
-
-func (nn *Node) cloneFinish(n *Node, nodeNodes map[*Node]*Node, portPorts map[*Port]*Port) {
-	for i, p := range n.InPorts {
-		nn.InPorts[i].cloneFinish(p, nodeNodes, portPorts)
-	}
-	for i, p := range n.OutPorts {
-		nn.OutPorts[i].cloneFinish(p, nodeNodes, portPorts)
-	}
-}
-
-func (p *Port) cloneStart() *Port {
-	return &Port{Out: p.Out}
-}
-
-func (pp *Port) cloneFinish(p *Port, nodeNodes map[*Node]*Node, portPorts map[*Port]*Port) {
-	pp.Node = nodeNodes[p.Node] // nodeNodes maps the wrong way for this
-	pp.Conns = make([]*Connection, len(p.Conns))
-	for i, c := range p.Conns {
-		pp.Conns[i] = &Connection{
-			Src: portPorts[c.Src],
-			Dst: portPorts[c.Dst],
-		}
-	}
 }

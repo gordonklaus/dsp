@@ -46,14 +46,17 @@ func (g *Graph) Layout(gtx C) D {
 				}
 			}
 		case key.EditEvent:
-			g.menu.activate(e)
-
-			// n := dsp.NewNode()
-			// g.graph.Nodes = append(g.graph.Nodes, n)
-			// nn := NewNode(n, g)
-			// g.nodes = append(g.nodes, nn)
-			// g.positionNodes()
-			// g.focus = nn
+			switch e.Text {
+			case "+", "-", "*", "/":
+				n := dsp.NewArithmeticNode(e.Text)
+				g.graph.Nodes = append(g.graph.Nodes, n)
+				nn := NewNode(n, g)
+				g.nodes = append(g.nodes, nn)
+				g.arrange()
+				g.focus = nn
+			default:
+				g.menu.activate(e)
+			}
 		}
 	}
 
