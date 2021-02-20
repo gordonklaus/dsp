@@ -46,17 +46,7 @@ func (g *Graph) Layout(gtx C) D {
 				}
 			}
 		case key.EditEvent:
-			switch e.Text {
-			case "+", "-", "*", "/":
-				n := dsp.NewArithmeticNode(e.Text)
-				g.graph.Nodes = append(g.graph.Nodes, n)
-				nn := NewNode(n, g)
-				g.nodes = append(g.nodes, nn)
-				g.arrange()
-				g.focus = nn
-			default:
-				g.menu.activate(e)
-			}
+			g.editEvent(e)
 		}
 	}
 
@@ -91,6 +81,20 @@ func (g *Graph) Layout(gtx C) D {
 	}
 
 	return D{Size: gtx.Constraints.Min}
+}
+
+func (g *Graph) editEvent(e key.EditEvent) {
+	switch e.Text {
+	case "+", "-", "*", "/":
+		n := dsp.NewOperatorNode(e.Text)
+		g.graph.Nodes = append(g.graph.Nodes, n)
+		nn := NewNode(n, g)
+		g.nodes = append(g.nodes, nn)
+		g.arrange()
+		g.focus = nn
+	default:
+		g.menu.activate(e)
+	}
 }
 
 func (g *Graph) arrange() {

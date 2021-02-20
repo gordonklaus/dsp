@@ -63,7 +63,7 @@ func NewNode(o types.Object) *Node {
 	return nil
 }
 
-func NewArithmeticNode(op string) *Node {
+func NewOperatorNode(op string) *Node {
 	n := &Node{Name: op}
 	n.InPorts = []*Port{{Node: n}, {Node: n}}
 	n.OutPorts = []*Port{{Out: true, Node: n}}

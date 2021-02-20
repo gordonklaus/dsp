@@ -89,6 +89,8 @@ func (n *Node) Layout(gtx C) D {
 					n.graph.focus = n.graph
 				}
 			}
+		case key.EditEvent:
+			n.graph.editEvent(e)
 		}
 	}
 

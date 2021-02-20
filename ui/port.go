@@ -77,6 +77,8 @@ func (p *Port) Layout(gtx C) D {
 					cc.editing = true
 				}
 			}
+		case key.EditEvent:
+			p.node.graph.editEvent(e)
 		}
 	}
 

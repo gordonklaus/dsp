@@ -107,6 +107,8 @@ func (c *Connection) Layout(gtx C) {
 					c.graph.focus = *c.focusedPort()
 				}
 			}
+		case key.EditEvent:
+			c.graph.editEvent(e)
 		}
 	}
 
