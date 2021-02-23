@@ -117,8 +117,10 @@ func (c *Connection) Layout(gtx C) {
 	path := clip.Path{}
 	path.Begin(gtx.Ops)
 	path.MoveTo(c.srcPt())
-	for _, p := range c.via {
-		path.Cube(f32.Pt(64, 0), p.Sub(f32.Pt(64, 0)).Sub(path.Pos()), p.Sub(path.Pos()))
+	if !c.editing {
+		for _, p := range c.via {
+			path.Cube(f32.Pt(64, 0), p.Sub(f32.Pt(64, 0)).Sub(path.Pos()), p.Sub(path.Pos()))
+		}
 	}
 	if c.editing && *c.focusedPort() == nil {
 		path.LineTo(c.dstPt())
