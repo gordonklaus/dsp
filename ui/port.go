@@ -48,17 +48,17 @@ func (p *Port) Layout(gtx C) D {
 						p.node.graph.focus = p.conns[0]
 						p.conns[0].focusdst = true
 					} else {
-						p.node.graph.focusNearestPort(p.positionInGraph(), e.Name, nil)
+						p.node.graph.focusNearest(p.position(), e.Name)
 					}
 				case key.NameRightArrow:
 					if p.port.Out && len(p.conns) > 0 {
 						p.node.graph.focus = p.conns[0]
 						p.conns[0].focusdst = false
 					} else {
-						p.node.graph.focusNearestPort(p.positionInGraph(), e.Name, nil)
+						p.node.graph.focusNearest(p.position(), e.Name)
 					}
 				case key.NameUpArrow, key.NameDownArrow:
-					p.node.graph.focusNearestPort(p.positionInGraph(), e.Name, nil)
+					p.node.graph.focusNearest(p.position(), e.Name)
 				case key.NameEscape:
 					p.node.graph.focus = p.node
 				case key.NameReturn:
@@ -78,7 +78,16 @@ func (p *Port) Layout(gtx C) D {
 				}
 			}
 		case key.EditEvent:
-			p.node.graph.editEvent(e)
+			if e.Text == "," || e.Text == "<" {
+				switch p.node.node.Name {
+				case "inport":
+					p.node.graph.ports.in.new(p.node, e.Text == ",")
+				case "outport":
+					p.node.graph.ports.out.new(p.node, e.Text == ",")
+				}
+			} else {
+				p.node.graph.editEvent(e)
+			}
 		}
 	}
 
@@ -106,7 +115,7 @@ func (p *Port) Layout(gtx C) D {
 	return D{Size: size}
 }
 
-func (p *Port) positionInGraph() f32.Point {
+func (p *Port) position() f32.Point {
 	return p.pos.Add(p.node.pos)
 }
 

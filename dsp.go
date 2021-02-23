@@ -6,7 +6,7 @@ import (
 )
 
 type Graph struct {
-	Nodes []*Node
+	InPorts, Nodes, OutPorts []*Node
 }
 
 type Node struct {
@@ -70,8 +70,27 @@ func NewOperatorNode(op string) *Node {
 	return n
 }
 
+func NewPortNode(out bool) *Node {
+	n := &Node{Name: "inport"}
+	if out {
+		n.Name = "outport"
+	}
+	p := &Port{Out: !out, Node: n}
+	if out {
+		n.InPorts = []*Port{p}
+	} else {
+		n.OutPorts = []*Port{p}
+	}
+	return n
+}
+
 func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
-	nodeLayers := make(map[*Node]int, len(g.Nodes))
+	allNodes := append(append(g.InPorts, g.Nodes...), g.OutPorts...)
+	if len(allNodes) == 0 {
+		return nil, nil
+	}
+
+	nodeLayers := make(map[*Node]int, len(allNodes))
 	firstLayer := 0
 	var assignLayer func(n *Node, layer int)
 	assignLayer = func(n *Node, layer int) {
@@ -91,7 +110,7 @@ func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
 
 	var sinks []*Node
 sinks:
-	for _, n := range g.Nodes {
+	for _, n := range allNodes {
 		for _, p := range n.OutPorts {
 			if len(p.Conns) > 0 {
 				continue sinks
@@ -121,15 +140,53 @@ sinks:
 		}
 	}
 
+	updatePorts := func(l1, l2 int, ports []*Node) bool {
+		if len(ports) == 0 {
+			return false
+		}
+		portsInLayer := 0
+		for _, n := range ports {
+			if nodeLayers[n] == l1 {
+				portsInLayer++
+			}
+		}
+		nodesInLayer := 0
+		for _, n := range allNodes {
+			if nodeLayers[n] == l1 {
+				nodesInLayer++
+			}
+		}
+		layerAdded := false
+		if portsInLayer != nodesInLayer {
+			l1 = l2
+			layerAdded = true
+		}
+		for _, n := range ports {
+			nodeLayers[n] = l1
+		}
+		return layerAdded
+	}
+	if updatePorts(firstLayer, firstLayer-1, g.InPorts) {
+		firstLayer--
+		numLayers++
+	}
+	if updatePorts(0, 1, g.OutPorts) {
+		numLayers++
+	}
+
 	layers := make([][]*Node, numLayers)
-	for _, n := range g.Nodes {
+	for _, n := range allNodes {
 		nodeLayers[n] -= firstLayer
 		l := nodeLayers[n]
 		layers[l] = append(layers[l], n)
 	}
 
+	if len(g.Nodes) == 0 {
+		return layers, nil
+	}
+
 	fakeConns := map[*Connection]*Connection{}
-	for _, n := range g.Nodes {
+	for _, n := range allNodes {
 		layer := nodeLayers[n]
 		for _, p := range n.InPorts {
 			for _, c := range p.Conns {
@@ -229,12 +286,21 @@ perms:
 		}
 
 		for i, p := range perms {
+			if len(g.InPorts) > 0 && i == 0 {
+				continue
+			}
+
 			nextPerm(p)
 			if p[0] < len(p) {
 				break
 			}
 			perms[i] = make([]int, len(p))
-			if i == len(perms)-1 {
+
+			lastLayer := len(perms) - 1
+			if len(g.OutPorts) > 0 {
+				lastLayer = len(perms) - 2
+			}
+			if i == lastLayer {
 				break perms
 			}
 		}

@@ -84,13 +84,22 @@ func (n *Node) Layout(gtx C) D {
 			if e.State == key.Press {
 				switch e.Name {
 				case key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow:
-					n.graph.focusNearestPort(n.pos.Add(layout.FPt(size).Mul(.5)), e.Name, nil)
+					n.graph.focusNearest(n.pos.Add(layout.FPt(size).Mul(.5)), e.Name)
 				case key.NameEscape:
 					n.graph.focus = n.graph
 				}
 			}
 		case key.EditEvent:
-			n.graph.editEvent(e)
+			if e.Text == "," || e.Text == "<" {
+				switch n.node.Name {
+				case "inport":
+					n.graph.ports.in.new(n, e.Text == ",")
+				case "outport":
+					n.graph.ports.out.new(n, e.Text == ",")
+				}
+			} else {
+				n.graph.editEvent(e)
+			}
 		}
 	}
 

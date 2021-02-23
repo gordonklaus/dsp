@@ -157,16 +157,16 @@ func (c *Connection) Layout(gtx C) {
 
 func (c *Connection) srcPt() f32.Point {
 	if c.src != nil {
-		return c.src.positionInGraph()
+		return c.src.position()
 	}
-	return c.dst.positionInGraph().Sub(f32.Pt(64, 0))
+	return c.dst.position().Sub(f32.Pt(64, 0))
 }
 
 func (c *Connection) dstPt() f32.Point {
 	if c.dst != nil {
-		return c.dst.positionInGraph()
+		return c.dst.position()
 	}
-	return c.src.positionInGraph().Add(f32.Pt(64, 0))
+	return c.src.position().Add(f32.Pt(64, 0))
 }
 
 func (c *Connection) focusedPort() **Port {

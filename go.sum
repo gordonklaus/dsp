@@ -4,7 +4,6 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037/go.mod h1:H6x//7
 gioui.org v0.0.0-20210116085804-99bfa6a33cdf/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
 gioui.org v0.0.0-20210201160312-bb56b8183c84 h1:legrGmmVL4FObz/D6sekGrFcrSZISML76QE29cyIArk=
 gioui.org v0.0.0-20210201160312-bb56b8183c84/go.mod h1:Y+uS7hHMvku1Q+ooaoq6fYD5B2LGoT8JtFgvmYmRzTw=
-gioui.org v0.0.0-20210209100840-ebfb17ec6c56 h1:lJnsoteLoUrTBXGcNiYuk/oYIKmQXFajYtehsS5qnuQ=
 gioui.org/x v0.0.0-20210120222453-b55819bc712b h1:C7/1fHOBkcypkgWopz8Mf+eDJggTWQWlL315KjhDVDQ=
 gioui.org/x v0.0.0-20210120222453-b55819bc712b/go.mod h1:+CDNGkslHDIe1EK2Q4E0G98qRllCaQrL6qtjBhBjSAo=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802 h1:1BDTz0u9nC3//pOCMdNH+CiXJVYJh5UQNCOBG7jbELc=
