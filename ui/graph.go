@@ -1,9 +1,12 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"math"
+	"os"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
@@ -16,7 +19,8 @@ import (
 )
 
 type Graph struct {
-	graph dsp.Graph
+	filename string
+	graph    *dsp.Graph
 
 	offset f32.Point
 
@@ -32,15 +36,81 @@ type Graph struct {
 	menu *Menu
 }
 
-func NewGraph() *Graph {
+func NewGraph(filename string) *Graph {
 	g := &Graph{
-		menu: NewMenu(),
+		filename: filename,
+		menu:     NewMenu(),
 	}
 	g.ports.in.graph = g
 	g.ports.out.graph = g
 	g.ports.out.out = true
 	g.focus = g
+
+	g.loadGraph()
+
 	return g
+}
+
+func (g *Graph) loadGraph() {
+	if g.filename == "" {
+		g.graph = &dsp.Graph{}
+		return
+	}
+	f, err := os.Open(g.filename)
+	if os.IsNotExist(err) {
+		fmt.Printf("file %q not found", g.filename)
+		g.graph = &dsp.Graph{}
+		return
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	graph, err := dsp.ReadGraph(f)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	g.graph = graph
+
+	for _, n := range graph.InPorts {
+		g.ports.in.nodes = append(g.ports.in.nodes, NewNode(n, g))
+	}
+	for _, n := range graph.OutPorts {
+		g.ports.out.nodes = append(g.ports.out.nodes, NewNode(n, g))
+	}
+	for _, n := range graph.Nodes {
+		g.nodes = append(g.nodes, NewNode(n, g))
+	}
+	connConns := map[*dsp.Connection]*Connection{}
+	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
+		for _, p := range n.inports {
+			for _, c := range p.port.Conns {
+				cc, ok := connConns[c]
+				if ok {
+					cc.dst = p
+				} else {
+					cc = NewConnection(c, g, nil, p)
+					g.conns = append(g.conns, cc)
+					connConns[c] = cc
+				}
+				p.conns = append(p.conns, cc)
+			}
+		}
+		for _, p := range n.outports {
+			for _, c := range p.port.Conns {
+				cc, ok := connConns[c]
+				if ok {
+					cc.src = p
+				} else {
+					cc = NewConnection(c, g, p, nil)
+					g.conns = append(g.conns, cc)
+					connConns[c] = cc
+				}
+				p.conns = append(p.conns, cc)
+			}
+		}
+	}
+	g.arrange()
 }
 
 func (g *Graph) Layout(gtx C) D {
@@ -242,6 +312,16 @@ func (g *Graph) editEvent(e key.EditEvent) {
 }
 
 func (g *Graph) arrange() {
+	if g.filename != "" {
+		f, err := os.Create(g.filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := dsp.WriteGraph(f, g.graph); err != nil {
+			log.Println(err)
+		}
+	}
+
 	layers, fakeConns := g.graph.Arrange()
 	nodeNodes := map[*dsp.Node]*Node{}
 	for _, n := range append(append(g.ports.in.nodes, g.nodes...), g.ports.out.nodes...) {

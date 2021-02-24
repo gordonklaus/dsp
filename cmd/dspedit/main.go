@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"gioui.org/app"
 	"gioui.org/io/system"
@@ -19,7 +20,11 @@ func main() {
 func Main() {
 	w := app.NewWindow(app.Title("DSP"), app.Size(unit.Dp(800), unit.Dp(600)))
 
-	graph := ui.NewGraph()
+	filename := ""
+	if len(os.Args) > 1 {
+		filename = os.Args[1]
+	}
+	graph := ui.NewGraph(filename)
 
 	var ops op.Ops
 	for e := range w.Events() {
