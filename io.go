@@ -3,14 +3,25 @@ package dsp
 import (
 	"encoding/gob"
 	"fmt"
-	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
-func WriteGraph(w io.Writer, g *Graph) error {
-	gg := graphGob{}
+func (g *Graph) Save() error {
+	nodes := []*Node{}
+	layers, _ := g.Layers()
+	for _, l := range layers {
+		for _, n := range l {
+			nodes = append(nodes, n)
+		}
+	}
+
+	gg := graphGob{Name: g.Name}
 	nodeIndex := map[*Node]int{}
 	portIndex := map[*Port]int{}
-	nodes := append(append(g.InPorts, g.Nodes...), g.OutPorts...)
 	for i, n := range nodes {
 		nodeIndex[n] = i
 		for pi, p := range n.OutPorts {
@@ -18,7 +29,10 @@ func WriteGraph(w io.Writer, g *Graph) error {
 		}
 	}
 	for i, n := range nodes {
-		gg.Nodes = append(gg.Nodes, nodeGob{Name: n.Name})
+		gg.Nodes = append(gg.Nodes, nodeGob{
+			Pkg:  n.Pkg,
+			Name: n.Name,
+		})
 		for pi, p := range n.InPorts {
 			for _, c := range p.Conns {
 				gg.Conns = append(gg.Conns, connGob{
@@ -30,25 +44,172 @@ func WriteGraph(w io.Writer, g *Graph) error {
 			}
 		}
 	}
-	return gob.NewEncoder(w).Encode(gg)
+
+	f, err := os.Create(g.FileName())
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if err := gob.NewEncoder(f).Encode(gg); err != nil {
+		return err
+	}
+
+	dir, _ := filepath.Split(g.FileName())
+	pkgName, err := pkgName(dir)
+	if err != nil {
+		return err
+	}
+
+	gof, err := os.Create(g.GoFileName())
+	if err != nil {
+		return err
+	}
+	defer gof.Close()
+
+	vars := map[*Port]string{}
+	varCount := 0
+	newVar := func(p *Port) string {
+		v := fmt.Sprintf("v%d", varCount)
+		vars[p] = v
+		varCount++
+		return v
+	}
+	getVar := func(p *Port) string {
+		if len(p.Conns) > 0 {
+			return vars[p.Conns[0].Src]
+		}
+		return "float32(0)"
+	}
+
+	fmt.Fprintf(gof, "package %s\n\n", pkgName)
+	fmt.Fprintf(gof, "func %s(", g.Name)
+	if len(g.InPorts) > 0 {
+		for i, n := range g.InPorts {
+			if i > 0 {
+				fmt.Fprint(gof, ", ")
+			}
+			fmt.Fprint(gof, newVar(n.OutPorts[0]))
+		}
+		fmt.Fprintf(gof, " float32")
+	}
+	fmt.Fprintf(gof, ") (")
+	if len(g.OutPorts) > 0 {
+		for i, n := range g.OutPorts {
+			if i > 0 {
+				fmt.Fprint(gof, ", ")
+			}
+			fmt.Fprint(gof, newVar(n.InPorts[0]))
+		}
+		fmt.Fprintf(gof, " float32")
+	}
+	fmt.Fprintf(gof, ") {")
+	for _, n := range nodes[len(g.InPorts) : len(nodes)-len(g.OutPorts)] {
+		fmt.Fprintf(gof, "\n\t")
+		if len(n.OutPorts) > 0 {
+			any := false
+			for i, p := range n.OutPorts {
+				if i > 0 {
+					fmt.Fprint(gof, ", ")
+				}
+				if len(p.Conns) > 0 {
+					fmt.Fprint(gof, newVar(p))
+					any = true
+				} else {
+					fmt.Fprint(gof, "_")
+				}
+			}
+			if any {
+				fmt.Fprintf(gof, " := ")
+			} else {
+				fmt.Fprintf(gof, " = ")
+			}
+		}
+		switch n.Name {
+		case "+", "-", "*", "/":
+			fmt.Fprintf(gof, "%s %s %s", getVar(n.InPorts[0]), n.Name, getVar(n.InPorts[1]))
+		default:
+			fmt.Fprintf(gof, "%s(", n.Name)
+			for i, p := range n.InPorts {
+				if i > 0 {
+					fmt.Fprint(gof, ", ")
+				}
+				fmt.Fprint(gof, getVar(p))
+			}
+			fmt.Fprint(gof, ")")
+		}
+	}
+	if len(g.OutPorts) > 0 {
+		fmt.Fprint(gof, "\n\treturn ")
+		for i, n := range g.OutPorts {
+			if i > 0 {
+				fmt.Fprint(gof, ", ")
+			}
+			fmt.Fprint(gof, getVar(n.InPorts[0]))
+		}
+	}
+	fmt.Fprintf(gof, "\n}")
+
+	return nil
 }
 
-func ReadGraph(r io.Reader) (*Graph, error) {
-	gg := graphGob{}
-	if err := gob.NewDecoder(r).Decode(&gg); err != nil {
+func pkgName(dir string) (string, error) {
+	cfg := &packages.Config{
+		Mode: packages.NeedName,
+		Dir:  dir,
+	}
+	pkgs, err := packages.Load(cfg, ".")
+	if err != nil {
+		return "", err
+	}
+	if pkgs[0].Name == "" {
+		dir, err := filepath.Abs(dir)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Base(dir), nil
+	}
+	return pkgs[0].Name, nil
+}
+
+func LoadGraph(name string) (*Graph, error) {
+	g := &Graph{}
+	if name == "" {
+		return g, nil
+	}
+
+	filename := name
+	if !strings.HasSuffix(name, ".dsp") {
+		g.Name = name
+		filename = g.FileName()
+	}
+
+	f, err := os.Open(filename)
+	if os.IsNotExist(err) {
+		if g.Name != "" {
+			return g, nil
+		}
 		return nil, err
 	}
-	g := &Graph{}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	gg := graphGob{}
+	if err := gob.NewDecoder(f).Decode(&gg); err != nil {
+		return nil, err
+	}
+	g.Name = gg.Name
 	nodes := make([]*Node, len(gg.Nodes))
 	for i, gn := range gg.Nodes {
-		n, err := newNode(gn.Name)
+		n, err := newNode(gn.Pkg, gn.Name)
 		if err != nil {
 			return nil, err
 		}
 		nodes[i] = n
-		if n.Name == "inport" {
+		if n.Pkg == "" && n.Name == "in" {
 			g.InPorts = append(g.InPorts, n)
-		} else if n.Name == "outport" {
+		} else if n.Pkg == "" && n.Name == "out" {
 			g.OutPorts = append(g.OutPorts, n)
 		} else {
 			g.Nodes = append(g.Nodes, n)
@@ -76,25 +237,30 @@ func ReadGraph(r io.Reader) (*Graph, error) {
 	return g, nil
 }
 
-func newNode(name string) (*Node, error) {
-	switch name {
-	case "inport":
-		return NewPortNode(false), nil
-	case "outport":
-		return NewPortNode(true), nil
-	case "+", "-", "*", "/":
-		return NewOperatorNode(name), nil
+func newNode(pkg, name string) (*Node, error) {
+	if pkg == "" {
+		switch name {
+		case "in":
+			return NewPortNode(false), nil
+		case "out":
+			return NewPortNode(true), nil
+		case "+", "-", "*", "/":
+			return NewOperatorNode(name), nil
+		}
+	} else {
+		// TODO
 	}
-	return nil, fmt.Errorf("unknown node %q", name)
+	return nil, fmt.Errorf(`unknown node "%s.%s"`, pkg, name)
 }
 
 type graphGob struct {
+	Name  string
 	Nodes []nodeGob
 	Conns []connGob
 }
 
 type nodeGob struct {
-	Name string
+	Pkg, Name string
 }
 
 type connGob struct {

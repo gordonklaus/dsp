@@ -78,11 +78,11 @@ func (p *Port) Layout(gtx C) D {
 				}
 			}
 		case key.EditEvent:
-			if e.Text == "," || e.Text == "<" {
+			if (e.Text == "," || e.Text == "<") && p.node.node.Pkg == "" {
 				switch p.node.node.Name {
-				case "inport":
+				case "in":
 					p.node.graph.ports.in.new(p.node, e.Text == ",")
-				case "outport":
+				case "out":
 					p.node.graph.ports.out.new(p.node, e.Text == ",")
 				}
 			} else {

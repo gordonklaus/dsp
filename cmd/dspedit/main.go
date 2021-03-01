@@ -20,11 +20,14 @@ func main() {
 func Main() {
 	w := app.NewWindow(app.Title("DSP"), app.Size(unit.Dp(800), unit.Dp(600)))
 
-	filename := ""
+	name := ""
 	if len(os.Args) > 1 {
-		filename = os.Args[1]
+		name = os.Args[1]
 	}
-	graph := ui.NewGraph(filename)
+	graph, err := ui.NewGraph(name)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var ops op.Ops
 	for e := range w.Events() {

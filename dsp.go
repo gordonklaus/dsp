@@ -3,14 +3,17 @@ package dsp
 import (
 	"go/types"
 	"math"
+	"sort"
+	"strings"
 )
 
 type Graph struct {
+	Name                     string
 	InPorts, Nodes, OutPorts []*Node
 }
 
 type Node struct {
-	Name              string
+	Pkg, Name         string
 	InPorts, OutPorts []*Port
 }
 
@@ -27,6 +30,7 @@ type Connection struct {
 
 func NewNode(o types.Object) *Node {
 	n := &Node{
+		Pkg:  o.Pkg().Path(),
 		Name: o.Name(),
 	}
 	switch o := o.(type) {
@@ -71,9 +75,9 @@ func NewOperatorNode(op string) *Node {
 }
 
 func NewPortNode(out bool) *Node {
-	n := &Node{Name: "inport"}
+	n := &Node{Name: "in"}
 	if out {
-		n.Name = "outport"
+		n.Name = "out"
 	}
 	p := &Port{Out: !out, Node: n}
 	if out {
@@ -84,8 +88,24 @@ func NewPortNode(out bool) *Node {
 	return n
 }
 
-func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
-	allNodes := append(append(g.InPorts, g.Nodes...), g.OutPorts...)
+func (n *Node) OutPortPos(p *Port) int {
+	for i, p2 := range n.OutPorts {
+		if p2 == p {
+			return i
+		}
+	}
+	panic("no such outport")
+}
+
+func (g *Graph) FileName() string   { return strings.ToLower(g.Name) + ".dsp" }
+func (g *Graph) GoFileName() string { return g.FileName() + ".go" }
+
+func (g *Graph) AllNodes() []*Node {
+	return append(append(g.InPorts, g.Nodes...), g.OutPorts...)
+}
+
+func (g *Graph) Layers() ([][]*Node, map[*Node]int) {
+	allNodes := g.AllNodes()
 	if len(allNodes) == 0 {
 		return nil, nil
 	}
@@ -181,12 +201,79 @@ sinks:
 		layers[l] = append(layers[l], n)
 	}
 
+	nodePositions := make(map[*Node]int, len(allNodes))
+	for i, n := range g.InPorts {
+		nodePositions[n] = i
+	}
+	for i, n := range g.OutPorts {
+		nodePositions[n] = i
+	}
+
+	for i, l := range layers {
+		if i == 0 && len(g.InPorts) > 0 {
+			continue
+		}
+		if i == len(layers)-1 && len(g.OutPorts) > 0 {
+			break
+		}
+		sort.Slice(l, func(i, j int) bool {
+			n1 := l[i]
+			n2 := l[j]
+			if n1.Name != n2.Name {
+				return n1.Name < n2.Name
+			}
+			if len(n1.InPorts) != len(n2.InPorts) {
+				return len(n1.InPorts) < len(n2.InPorts)
+			}
+			if len(n1.OutPorts) != len(n2.OutPorts) {
+				return len(n1.OutPorts) < len(n2.OutPorts)
+			}
+			for i, p1 := range n1.InPorts {
+				p2 := n2.InPorts[i]
+				if len(p1.Conns) != len(p2.Conns) {
+					return len(p1.Conns) < len(p2.Conns)
+				}
+				for i, c1 := range p1.Conns {
+					c2 := p2.Conns[i]
+					if nodeLayers[c1.Src.Node] != nodeLayers[c2.Src.Node] {
+						return nodeLayers[c1.Src.Node] < nodeLayers[c2.Src.Node]
+					}
+					if nodePositions[c1.Src.Node] != nodePositions[c2.Src.Node] {
+						return nodePositions[c1.Src.Node] < nodePositions[c2.Src.Node]
+					}
+					n := c1.Src.Node
+					if c1.Src != c2.Src {
+						return n.OutPortPos(c1.Src) < n.OutPortPos(c2.Src)
+					}
+				}
+			}
+			for i, p1 := range n1.OutPorts {
+				p2 := n2.OutPorts[i]
+				if len(p1.Conns) != len(p2.Conns) {
+					return len(p1.Conns) < len(p2.Conns)
+				}
+				for i, c1 := range p1.Conns {
+					c2 := p2.Conns[i]
+					if nodeLayers[c1.Src.Node] != nodeLayers[c2.Src.Node] {
+						return nodeLayers[c1.Src.Node] < nodeLayers[c2.Src.Node]
+					}
+				}
+			}
+			return true
+		})
+	}
+
+	return layers, nodeLayers
+}
+
+func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
+	layers, nodeLayers := g.Layers()
 	if len(g.Nodes) == 0 {
 		return layers, nil
 	}
 
 	fakeConns := map[*Connection]*Connection{}
-	for _, n := range allNodes {
+	for _, n := range g.AllNodes() {
 		layer := nodeLayers[n]
 		for _, p := range n.InPorts {
 			for _, c := range p.Conns {

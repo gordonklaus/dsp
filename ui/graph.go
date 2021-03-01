@@ -1,12 +1,11 @@
 package ui
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"math"
-	"os"
+	"unicode"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
@@ -19,8 +18,7 @@ import (
 )
 
 type Graph struct {
-	filename string
-	graph    *dsp.Graph
+	graph *dsp.Graph
 
 	offset f32.Point
 
@@ -36,39 +34,26 @@ type Graph struct {
 	menu *Menu
 }
 
-func NewGraph(filename string) *Graph {
+func NewGraph(name string) (*Graph, error) {
 	g := &Graph{
-		filename: filename,
-		menu:     NewMenu(),
+		menu: NewMenu(),
 	}
 	g.ports.in.graph = g
 	g.ports.out.graph = g
 	g.ports.out.out = true
 	g.focus = g
 
-	g.loadGraph()
+	if err := g.loadGraph(name); err != nil {
+		return nil, err
+	}
 
-	return g
+	return g, nil
 }
 
-func (g *Graph) loadGraph() {
-	if g.filename == "" {
-		g.graph = &dsp.Graph{}
-		return
-	}
-	f, err := os.Open(g.filename)
-	if os.IsNotExist(err) {
-		fmt.Printf("file %q not found", g.filename)
-		g.graph = &dsp.Graph{}
-		return
-	}
+func (g *Graph) loadGraph(name string) error {
+	graph, err := dsp.LoadGraph(name)
 	if err != nil {
-		log.Fatal(err)
-	}
-	graph, err := dsp.ReadGraph(f)
-	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	g.graph = graph
 
@@ -111,6 +96,7 @@ func (g *Graph) loadGraph() {
 		}
 	}
 	g.arrange()
+	return nil
 }
 
 func (g *Graph) Layout(gtx C) D {
@@ -307,17 +293,15 @@ func (g *Graph) editEvent(e key.EditEvent) {
 		g.arrange()
 		g.focus = nn
 	default:
-		g.menu.activate(e)
+		if unicode.IsLetter([]rune(e.Text)[0]) {
+			g.menu.activate(e)
+		}
 	}
 }
 
 func (g *Graph) arrange() {
-	if g.filename != "" {
-		f, err := os.Create(g.filename)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := dsp.WriteGraph(f, g.graph); err != nil {
+	if g.graph.Name != "" {
+		if err := g.graph.Save(); err != nil {
 			log.Println(err)
 		}
 	}
