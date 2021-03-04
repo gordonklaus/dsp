@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -66,6 +67,29 @@ func (g *Graph) Save() error {
 	}
 	defer gof.Close()
 
+	fmt.Fprintf(gof, "package %s\n\n", pkgName)
+
+	pkgNames := map[string]string{}
+	pkgCount := 0
+	for _, n := range nodes {
+		if n.Pkg != "" {
+			pkgNames[n.Pkg] = fmt.Sprint("p", pkgCount)
+			pkgCount++
+		}
+	}
+	if len(pkgNames) > 0 {
+		imports := []string{}
+		for p := range pkgNames {
+			imports = append(imports, p)
+		}
+		sort.Strings(imports)
+		fmt.Fprint(gof, "import (\n")
+		for _, p := range imports {
+			fmt.Fprintf(gof, "\t%s %q\n", pkgNames[p], p)
+		}
+		fmt.Fprint(gof, ")\n\n")
+	}
+
 	vars := map[*Port]string{}
 	varCount := 0
 	newVar := func(p *Port) string {
@@ -81,7 +105,6 @@ func (g *Graph) Save() error {
 		return "float32(0)"
 	}
 
-	fmt.Fprintf(gof, "package %s\n\n", pkgName)
 	fmt.Fprintf(gof, "func %s(", g.Name)
 	if len(g.InPorts) > 0 {
 		for i, n := range g.InPorts {
@@ -128,7 +151,11 @@ func (g *Graph) Save() error {
 		case "+", "-", "*", "/":
 			fmt.Fprintf(gof, "%s %s %s", getVar(n.InPorts[0]), n.Name, getVar(n.InPorts[1]))
 		default:
-			fmt.Fprintf(gof, "%s(", n.Name)
+			if pn, ok := pkgNames[n.Pkg]; ok {
+				fmt.Fprintf(gof, "%s.%s(", pn, n.Name)
+			} else {
+				fmt.Fprintf(gof, "%s(", n.Name)
+			}
 			for i, p := range n.InPorts {
 				if i > 0 {
 					fmt.Fprint(gof, ", ")
@@ -238,19 +265,34 @@ func LoadGraph(name string) (*Graph, error) {
 }
 
 func newNode(pkg, name string) (*Node, error) {
-	if pkg == "" {
-		switch name {
-		case "in":
-			return NewPortNode(false), nil
-		case "out":
-			return NewPortNode(true), nil
-		case "+", "-", "*", "/":
-			return NewOperatorNode(name), nil
+	if pkg != "" {
+		cfg := &packages.Config{
+			Mode: packages.NeedName | packages.NeedTypes,
+			Dir:  ".",
 		}
-	} else {
-		// TODO
+		pkgs, err := packages.Load(cfg, pkg)
+		if err != nil {
+			return nil, err
+		}
+		if len(pkgs[0].Errors) > 0 {
+			return nil, fmt.Errorf("errors in package %q: %s", pkg, pkgs[0].Errors)
+		}
+		obj := pkgs[0].Types.Scope().Lookup(name)
+		if obj == nil {
+			return nil, fmt.Errorf("no name %q in package %q", name, pkg)
+		}
+		return NewNode(obj), nil
 	}
-	return nil, fmt.Errorf(`unknown node "%s.%s"`, pkg, name)
+
+	switch name {
+	case "in":
+		return NewPortNode(false), nil
+	case "out":
+		return NewPortNode(true), nil
+	case "+", "-", "*", "/":
+		return NewOperatorNode(name), nil
+	}
+	return nil, fmt.Errorf("unknown node %q", name)
 }
 
 type graphGob struct {

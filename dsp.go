@@ -47,7 +47,7 @@ func NewNode(o types.Object) *Node {
 				Node: n,
 				Name: v.Name()},
 			)
-			if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float64 {
+			if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float32 {
 				return nil
 			}
 		}
@@ -58,7 +58,7 @@ func NewNode(o types.Object) *Node {
 				Node: n,
 				Name: v.Name()},
 			)
-			if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float64 {
+			if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float32 {
 				return nil
 			}
 		}
