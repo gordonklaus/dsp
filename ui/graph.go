@@ -355,14 +355,32 @@ func (g *Graph) arrange() {
 	}
 }
 
-func (g *Graph) deleteConn(c *Connection) {
-	c.src.disconnect(c)
-	c.dst.disconnect(c)
-	for i, c2 := range g.conns {
-		if c2 == c {
-			g.conns = append(g.conns[:i], g.conns[i+1:]...)
-			break
+func (g *Graph) deleteNode(n *Node) {
+	del := func(nodes *[]*Node, nnodes *[]*dsp.Node) {
+		for i, n2 := range *nodes {
+			if n2 == n {
+				*nodes = append((*nodes)[:i], (*nodes)[i+1:]...)
+				break
+			}
 		}
+		for i, n2 := range *nnodes {
+			if n2 == n.node {
+				*nnodes = append((*nnodes)[:i], (*nnodes)[i+1:]...)
+				break
+			}
+		}
+	}
+	for _, p := range append(n.inports, n.outports...) {
+		for len(p.conns) > 0 {
+			p.conns[0].delete()
+		}
+	}
+	if n.node.Pkg == "" && n.node.Name == "in" {
+		del(&g.ports.in.nodes, &g.graph.InPorts)
+	} else if n.node.Pkg == "" && n.node.Name == "out" {
+		del(&g.ports.out.nodes, &g.graph.OutPorts)
+	} else {
+		del(&g.nodes, &g.graph.Nodes)
 	}
 }
 

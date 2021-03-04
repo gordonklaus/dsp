@@ -59,6 +59,20 @@ func (c *Connection) Layout(gtx C) {
 						if p != nil {
 							*c.focusedPort() = p
 						}
+					case key.NameDeleteBackward:
+						c.graph.focus = c.dst
+						if c.src != nil {
+							c.graph.focus = c.src
+						}
+						c.delete()
+						c.graph.arrange()
+					case key.NameDeleteForward:
+						c.graph.focus = c.src
+						if c.dst != nil {
+							c.graph.focus = c.dst
+						}
+						c.delete()
+						c.graph.arrange()
 					case key.NameEscape:
 						if c.originalPort == nil && *c.focusedPort() == nil {
 							c.graph.focus = c.nonfocusedPort()
@@ -106,11 +120,11 @@ func (c *Connection) Layout(gtx C) {
 					c.editing = true
 				case key.NameDeleteBackward:
 					c.graph.focus = c.src
-					c.graph.deleteConn(c)
+					c.delete()
 					c.graph.arrange()
 				case key.NameDeleteForward:
 					c.graph.focus = c.dst
-					c.graph.deleteConn(c)
+					c.delete()
 					c.graph.arrange()
 				case key.NameEscape:
 					c.graph.focus = *c.focusedPort()

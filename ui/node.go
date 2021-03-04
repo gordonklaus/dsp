@@ -85,6 +85,10 @@ func (n *Node) Layout(gtx C) D {
 				switch e.Name {
 				case key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow:
 					n.graph.focusNearest(n.pos.Add(layout.FPt(size).Mul(.5)), e.Name)
+				case key.NameDeleteBackward, key.NameDeleteForward:
+					n.graph.deleteNode(n)
+					n.graph.arrange()
+					n.graph.focus = n.graph
 				case key.NameEscape:
 					n.graph.focus = n.graph
 				}

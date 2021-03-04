@@ -59,6 +59,11 @@ func (p *Port) Layout(gtx C) D {
 					}
 				case key.NameUpArrow, key.NameDownArrow:
 					p.node.graph.focusNearest(p.position(), e.Name)
+				case key.NameDeleteBackward, key.NameDeleteForward:
+					for len(p.conns) > 0 {
+						p.conns[0].delete()
+					}
+					p.node.graph.arrange()
 				case key.NameEscape:
 					p.node.graph.focus = p.node
 				case key.NameReturn:
