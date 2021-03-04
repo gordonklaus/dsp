@@ -313,10 +313,12 @@ func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
 		}
 	}
 
-	inPortIndex := func(p *Port, l []*Node) int {
-		for i, n := range l {
-			for _, p2 := range n.InPorts {
-				if p2 == p {
+	idst := func(c *Connection, l []*Node) int {
+		i := 0
+		for _, n := range l {
+			for _, p := range n.InPorts {
+				i++
+				if p == c.Dst {
 					return i
 				}
 			}
@@ -339,25 +341,26 @@ perms:
 		for i := range layers[:len(layers)-1] {
 			l0 := getPerm(layers[i], perms[i])
 			l1 := getPerm(layers[i+1], perms[i+1])
-			for i0a, n := range l0 {
+			i0a := 0
+			for _, n := range l0 {
 				for _, p := range n.OutPorts {
-					for _, ca := range p.Conns {
-						if c, ok := fakeConns[ca]; ok {
-							ca = c
+					i0a++
+					for _, c := range p.Conns {
+						if c2, ok := fakeConns[c]; ok {
+							c = c2
 						}
-						i1a := inPortIndex(ca.Dst, l1)
+						i1a := idst(c, l1)
 
-						for i0b, n := range l0[:i0a] {
+						i0b := 0
+						for _, n := range l0 {
 							for _, p := range n.OutPorts {
-								for _, cb := range p.Conns {
-									if c, ok := fakeConns[cb]; ok {
-										cb = c
+								i0b++
+								for _, c := range p.Conns {
+									if c2, ok := fakeConns[c]; ok {
+										c = c2
 									}
-									if cb == ca {
-										continue
-									}
+									i1b := idst(c, l1)
 
-									i1b := inPortIndex(cb.Dst, l1)
 									if (i0b-i0a)*(i1b-i1a) < 0 {
 										crossings++
 									}
