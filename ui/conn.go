@@ -102,19 +102,36 @@ func (c *Connection) Layout(gtx C) {
 				}
 
 				switch e.Name {
-				case key.NameLeftArrow:
-					if c.focusdst {
-						c.focusdst = false
-					} else if c.src != nil {
-						c.graph.focus = c.src
-					}
-				case key.NameRightArrow:
-					if !c.focusdst {
-						c.focusdst = true
-					} else if c.dst != nil {
-						c.graph.focus = c.dst
+				case key.NameLeftArrow, key.NameRightArrow:
+					if e.Name == key.NameLeftArrow == c.focusdst {
+						c.focusdst = !c.focusdst
+					} else {
+						p := c.graph.nearestPort((*c.focusedPort()).position(), e.Name, func(*Port) bool { return true })
+						if p != nil {
+							if c2 := p.centralConn(); c2 != nil {
+								c.graph.focus = c2
+								c2.focusdst = !c.focusdst
+							} else {
+								c.graph.focus = p
+							}
+						}
 					}
 				case key.NameUpArrow, key.NameDownArrow:
+					next := (*c.focusedPort()).nextConn(c, e.Name == key.NameUpArrow)
+					if next != nil {
+						c.graph.focus = next
+						next.focusdst = c.focusdst
+					} else {
+						p := c.graph.nearestPort((*c.focusedPort()).position(), e.Name, func(*Port) bool { return true })
+						if p != nil {
+							if c2 := p.firstConn(e.Name == key.NameUpArrow); c2 != nil {
+								c.graph.focus = c2
+								c2.focusdst = c.focusdst
+							} else {
+								c.graph.focus = p
+							}
+						}
+					}
 				case key.NameReturn:
 					c.originalPort = *c.focusedPort()
 					c.editing = true

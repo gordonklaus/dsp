@@ -3,6 +3,7 @@ package ui
 import (
 	"image"
 	"image/color"
+	"math"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
@@ -45,15 +46,13 @@ func (p *Port) Layout(gtx C) D {
 				switch e.Name {
 				case key.NameLeftArrow:
 					if !p.port.Out && len(p.conns) > 0 {
-						p.node.graph.focus = p.conns[0]
-						p.conns[0].focusdst = true
+						p.focusCentralConn()
 					} else {
 						p.node.graph.focusNearest(p.position(), e.Name)
 					}
 				case key.NameRightArrow:
 					if p.port.Out && len(p.conns) > 0 {
-						p.node.graph.focus = p.conns[0]
-						p.conns[0].focusdst = false
+						p.focusCentralConn()
 					} else {
 						p.node.graph.focusNearest(p.position(), e.Name)
 					}
@@ -118,6 +117,91 @@ func (p *Port) Layout(gtx C) D {
 	key.InputOp{Tag: p}.Add(gtx.Ops)
 
 	return D{Size: size}
+}
+
+func (p *Port) centralConn() *Connection {
+	var c *Connection
+	dist := math.MaxFloat32
+	for _, c2 := range p.conns {
+		if d := math.Abs(float64(connY(c2, p.port.Out) - p.position().Y)); d < dist {
+			dist = d
+			c = c2
+		}
+	}
+	return c
+}
+
+func (p *Port) focusCentralConn() {
+	if c := p.centralConn(); c != nil {
+		p.node.graph.focus = c
+		c.focusdst = !p.port.Out
+	}
+}
+
+func (p *Port) nextConn(c *Connection, prev bool) *Connection {
+	var next *Connection
+	dist := float32(math.MaxFloat32)
+	for _, c2 := range p.conns {
+		d := connY(c2, p.port.Out) - connY(c, p.port.Out)
+		if prev {
+			d = -d
+		}
+		if d > 0 && d < dist {
+			dist = d
+			next = c2
+		}
+	}
+	if next == nil {
+		if p2 := p.nextPort(prev); p2 != nil {
+			next = p2.firstConn(prev)
+		}
+	}
+	return next
+}
+
+func (p *Port) nextPort(prev bool) *Port {
+	ports := p.node.inports
+	if p.port.Out {
+		ports = p.node.outports
+	}
+	for i, p2 := range ports {
+		if p2 == p {
+			if prev && i > 0 {
+				return ports[i-1]
+			}
+			if !prev && i+1 < len(ports) {
+				return ports[i+1]
+			}
+			return nil
+		}
+	}
+	panic("unreached")
+}
+
+func (p *Port) firstConn(last bool) *Connection {
+	var c *Connection
+	y := float32(0)
+	for _, c2 := range p.conns {
+		y2 := connY(c2, p.port.Out)
+		if c == nil || !last && y2 < y || last && y2 > y {
+			y = y2
+			c = c2
+		}
+	}
+	return c
+}
+
+func connY(c *Connection, out bool) float32 {
+	if out {
+		if len(c.via) > 0 {
+			return c.via[0].Y
+		}
+		return c.dst.position().Y
+	}
+	if len(c.via) > 0 {
+		return c.via[len(c.via)-1].Y
+	}
+	return c.src.position().Y
 }
 
 func (p *Port) position() f32.Point {
