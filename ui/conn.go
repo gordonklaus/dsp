@@ -46,7 +46,16 @@ func (c *Connection) Layout(gtx C) {
 						if c.focusdst {
 							pt = c.dstPt()
 						}
-						p := c.graph.nearestPort(pt, e.Name, func(p *Port) bool { return p.port.Out != c.focusdst })
+						p := c.graph.nearestPort(pt, e.Name, func(p *Port) bool {
+							if p.port.Out == c.focusdst || !p.port.Out && len(p.conns) > 0 && p != c.originalPort {
+								return false
+							}
+							srcNode, dstNode := p.node, c.nonfocusedPort().node
+							if c.focusdst {
+								srcNode, dstNode = dstNode, srcNode
+							}
+							return !isOrPrecedes(dstNode, srcNode)
+						})
 						if p != nil {
 							*c.focusedPort() = p
 						}
@@ -155,6 +164,20 @@ func (c *Connection) Layout(gtx C) {
 	paint.PaintOp{}.Add(gtx.Ops)
 
 	key.InputOp{Tag: c}.Add(gtx.Ops)
+}
+
+func isOrPrecedes(n1, n2 *Node) bool {
+	if n1 == n2 {
+		return true
+	}
+	for _, p := range n1.outports {
+		for _, c := range p.conns {
+			if isOrPrecedes(c.dst.node, n2) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *Connection) srcPt() f32.Point {
