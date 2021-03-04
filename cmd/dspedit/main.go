@@ -18,7 +18,7 @@ func main() {
 }
 
 func Main() {
-	w := app.NewWindow(app.Title("DSP"), app.Size(unit.Dp(800), unit.Dp(600)))
+	w := app.NewWindow(app.Title("DSP"), app.Size(unit.Dp(1600), unit.Dp(900)))
 
 	name := ""
 	if len(os.Args) > 1 {

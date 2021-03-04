@@ -315,28 +315,41 @@ func (g *Graph) arrange() {
 		c.via = nil
 	}
 	for i, l := range layers {
-		x := 192 * (float32(i) - float32(len(layers)-1)/2)
+		x := 192 * (float32(i) - float32(len(layers))/2)
+		height := 0
+		ys := make([]int, len(l))
 		for i, n := range l {
-			y := 64 * (float32(i) - float32(len(l)-1)/2)
+			if i > 0 {
+				height += 16
+			}
+			ys[i] = height
+			if nn, ok := nodeNodes[n]; ok {
+				height += nn.Layout(C{Ops: new(op.Ops)}).Size.Y
+			}
+		}
+
+		for i, n := range l {
+			y := float32(ys[i]) - float32(height/2)
 			if nn, ok := nodeNodes[n]; ok {
 				nn.target = f32.Pt(x, y)
-			} else {
-			outer:
-				for {
-					prev := n.InPorts[0].Conns[0].Src.Node
-					if nn, ok := nodeNodes[prev]; ok {
-						for _, p := range nn.outports {
-							for _, c := range p.conns {
-								if cc, ok := fakeConns[c.conn]; ok && cc.Dst.Node == n {
-									c.via = append(c.via, f32.Pt(x, y))
-									break outer
-								}
+				continue
+			}
+
+		outer:
+			for {
+				prev := n.InPorts[0].Conns[0].Src.Node
+				if nn, ok := nodeNodes[prev]; ok {
+					for _, p := range nn.outports {
+						for _, c := range p.conns {
+							if cc, ok := fakeConns[c.conn]; ok && cc.Dst.Node == n {
+								c.via = append(c.via, f32.Pt(x+nodeWidth/2, y))
+								break outer
 							}
 						}
-						panic("unreached")
 					}
-					n = prev
+					panic("unreached")
 				}
+				n = prev
 			}
 		}
 	}

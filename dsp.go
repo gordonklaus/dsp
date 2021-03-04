@@ -261,6 +261,9 @@ sinks:
 			}
 			return true
 		})
+		for i, n := range l {
+			nodePositions[n] = i
+		}
 	}
 
 	return layers, nodeLayers
