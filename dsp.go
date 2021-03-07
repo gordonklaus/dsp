@@ -74,6 +74,18 @@ func NewOperatorNode(op string) *Node {
 	return n
 }
 
+const nodepkg = "github.com/gordonklaus/dsp/node"
+
+func NewDelayNode() *Node {
+	n := &Node{
+		Pkg:  nodepkg,
+		Name: "Delay",
+	}
+	n.InPorts = []*Port{{Node: n}, {Node: n}}
+	n.OutPorts = []*Port{{Out: true, Node: n}}
+	return n
+}
+
 func NewPortNode(out bool) *Node {
 	n := &Node{Name: "in"}
 	if out {
@@ -87,6 +99,10 @@ func NewPortNode(out bool) *Node {
 	}
 	return n
 }
+
+func IsDelay(n *Node) bool   { return n.Pkg == nodepkg && n.Name == "Delay" }
+func IsInport(n *Node) bool  { return n.Pkg == "" && n.Name == "in" }
+func IsOutport(n *Node) bool { return n.Pkg == "" && n.Name == "out" }
 
 func (n *Node) OutPortPos(p *Port) int {
 	for i, p2 := range n.OutPorts {

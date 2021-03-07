@@ -4,8 +4,10 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -70,11 +72,15 @@ func (g *Graph) Save() error {
 	fmt.Fprintf(gof, "package %s\n\n", pkgName)
 
 	pkgNames := map[string]string{}
-	pkgCount := 0
+	pkgCounts := map[string]int{}
 	for _, n := range nodes {
 		if n.Pkg != "" {
-			pkgNames[n.Pkg] = fmt.Sprint("p", pkgCount)
-			pkgCount++
+			p := path.Base(n.Pkg)
+			if x := pkgCounts[p]; x > 0 {
+				p += strconv.Itoa(x)
+			}
+			pkgCounts[p]++
+			pkgNames[n.Pkg] = p
 		}
 	}
 	if len(pkgNames) > 0 {
@@ -105,7 +111,49 @@ func (g *Graph) Save() error {
 		return "float32(0)"
 	}
 
-	fmt.Fprintf(gof, "func %s(", g.Name)
+	fieldCounts := map[string]int{}
+	fieldNames := map[*Node]string{}
+	writeField := func(n *Node) {
+		if len(fieldNames) == 0 {
+			fmt.Fprintln(gof, "type", g.Name, "struct {")
+		}
+
+		name := n.Name
+		if x := fieldCounts[name]; x > 0 {
+			name += strconv.Itoa(x + 1)
+		}
+		fieldCounts[name]++
+		fieldNames[n] = name
+		typ := n.Name
+		if pn, ok := pkgNames[n.Pkg]; ok {
+			typ = fmt.Sprintf("%s.%s", pn, n.Name)
+		}
+		fmt.Fprintf(gof, "\t%s %s\n", name, typ)
+	}
+	for _, n := range nodes {
+		if IsDelay(n) {
+			writeField(n)
+		}
+	}
+	if len(fieldNames) > 0 {
+		fmt.Fprint(gof, "}\n\n")
+	}
+
+	if len(fieldNames) > 0 {
+		fmt.Fprintf(gof, "func (x *%s) Init(c %s.Config) {\n", g.Name, pkgNames[nodepkg])
+		for _, n := range nodes {
+			if f, ok := fieldNames[n]; ok {
+				fmt.Fprintf(gof, "\tx.%s.Init(c)\n", f)
+			}
+		}
+		fmt.Fprint(gof, "}\n\n")
+	}
+
+	if len(fieldNames) > 0 {
+		fmt.Fprintf(gof, "func (x *%s) Process(", g.Name)
+	} else {
+		fmt.Fprintf(gof, "func %s(", g.Name)
+	}
 	if len(g.InPorts) > 0 {
 		for i, n := range g.InPorts {
 			if i > 0 {
@@ -125,9 +173,19 @@ func (g *Graph) Save() error {
 		}
 		fmt.Fprintf(gof, " float32")
 	}
-	fmt.Fprintf(gof, ") {")
+	fmt.Fprintf(gof, ") {\n")
 	for _, n := range nodes[len(g.InPorts) : len(nodes)-len(g.OutPorts)] {
-		fmt.Fprintf(gof, "\n\t")
+		if IsDelay(n) {
+			fmt.Fprintf(gof, "\tx.%s.Write(%s)\n", fieldNames[n], getVar(n.InPorts[0]))
+			for i, p := range n.OutPorts {
+				if len(p.Conns) > 0 {
+					fmt.Fprintf(gof, "\t%s := x.%s.Read(%s)\n", newVar(p), fieldNames[n], getVar(n.InPorts[1+i]))
+				}
+			}
+			continue
+		}
+
+		fmt.Fprintf(gof, "\t")
 		if len(n.OutPorts) > 0 {
 			any := false
 			for i, p := range n.OutPorts {
@@ -149,7 +207,7 @@ func (g *Graph) Save() error {
 		}
 		switch n.Name {
 		case "+", "-", "*", "/":
-			fmt.Fprintf(gof, "%s %s %s", getVar(n.InPorts[0]), n.Name, getVar(n.InPorts[1]))
+			fmt.Fprintf(gof, "%s %s %s\n", getVar(n.InPorts[0]), n.Name, getVar(n.InPorts[1]))
 		default:
 			if pn, ok := pkgNames[n.Pkg]; ok {
 				fmt.Fprintf(gof, "%s.%s(", pn, n.Name)
@@ -162,11 +220,11 @@ func (g *Graph) Save() error {
 				}
 				fmt.Fprint(gof, getVar(p))
 			}
-			fmt.Fprint(gof, ")")
+			fmt.Fprint(gof, ")\n")
 		}
 	}
 	if len(g.OutPorts) > 0 {
-		fmt.Fprint(gof, "\n\treturn ")
+		fmt.Fprint(gof, "\treturn ")
 		for i, n := range g.OutPorts {
 			if i > 0 {
 				fmt.Fprint(gof, ", ")
@@ -234,9 +292,9 @@ func LoadGraph(name string) (*Graph, error) {
 			return nil, err
 		}
 		nodes[i] = n
-		if n.Pkg == "" && n.Name == "in" {
+		if IsInport(n) {
 			g.InPorts = append(g.InPorts, n)
-		} else if n.Pkg == "" && n.Name == "out" {
+		} else if IsOutport(n) {
 			g.OutPorts = append(g.OutPorts, n)
 		} else {
 			g.Nodes = append(g.Nodes, n)
@@ -265,6 +323,10 @@ func LoadGraph(name string) (*Graph, error) {
 }
 
 func newNode(pkg, name string) (*Node, error) {
+	if pkg == nodepkg && name == "Delay" {
+		return NewDelayNode(), nil
+	}
+
 	if pkg != "" {
 		cfg := &packages.Config{
 			Mode: packages.NeedName | packages.NeedTypes,

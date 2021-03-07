@@ -56,7 +56,9 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 	}
 
 	y = textHeight + .75*portSize
-	if d := maxPorts - len(node.OutPorts); d > 0 {
+	if dsp.IsDelay(n.node) {
+		y += 1.5 * portSize
+	} else if d := maxPorts - len(node.OutPorts); d > 0 {
 		y += .75 * portSize * float32(d)
 	}
 	for _, p := range node.OutPorts {
@@ -94,11 +96,10 @@ func (n *Node) Layout(gtx C) D {
 				}
 			}
 		case key.EditEvent:
-			if (e.Text == "," || e.Text == "<") && n.node.Pkg == "" {
-				switch n.node.Name {
-				case "in":
+			if e.Text == "," || e.Text == "<" {
+				if dsp.IsInport(n.node) {
 					n.graph.ports.in.new(n, e.Text == ",")
-				case "out":
+				} else if dsp.IsOutport(n.node) {
 					n.graph.ports.out.new(n, e.Text == ",")
 				}
 			} else {

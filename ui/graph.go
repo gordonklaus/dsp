@@ -175,9 +175,7 @@ func (g *Graph) Layout(gtx C) D {
 	st.Load()
 
 	if n := g.menu.Layout(gtx); n != nil {
-		g.graph.Nodes = append(g.graph.Nodes, n)
-		g.nodes = append(g.nodes, NewNode(n, g))
-		g.arrange()
+		g.addNode(n)
 	}
 
 	return D{Size: gtx.Constraints.Min}
@@ -286,17 +284,22 @@ func (pg *portsGroup) layout(gtx C, rect image.Rectangle) {
 func (g *Graph) editEvent(e key.EditEvent) {
 	switch e.Text {
 	case "+", "-", "*", "/":
-		n := dsp.NewOperatorNode(e.Text)
-		g.graph.Nodes = append(g.graph.Nodes, n)
-		nn := NewNode(n, g)
-		g.nodes = append(g.nodes, nn)
-		g.arrange()
-		g.focus = nn
+		g.addNode(dsp.NewOperatorNode(e.Text))
+	case "=":
+		g.addNode(dsp.NewDelayNode())
 	default:
 		if unicode.IsLetter([]rune(e.Text)[0]) {
 			g.menu.activate(e)
 		}
 	}
+}
+
+func (g *Graph) addNode(n *dsp.Node) {
+	g.graph.Nodes = append(g.graph.Nodes, n)
+	nn := NewNode(n, g)
+	g.nodes = append(g.nodes, nn)
+	g.arrange()
+	g.focus = nn
 }
 
 func (g *Graph) arrange() {
@@ -375,9 +378,9 @@ func (g *Graph) deleteNode(n *Node) {
 			p.conns[0].delete()
 		}
 	}
-	if n.node.Pkg == "" && n.node.Name == "in" {
+	if dsp.IsInport(n.node) {
 		del(&g.ports.in.nodes, &g.graph.InPorts)
-	} else if n.node.Pkg == "" && n.node.Name == "out" {
+	} else if dsp.IsOutport(n.node) {
 		del(&g.ports.out.nodes, &g.graph.OutPorts)
 	} else {
 		del(&g.nodes, &g.graph.Nodes)
