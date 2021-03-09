@@ -15,6 +15,7 @@ type Graph struct {
 type Node struct {
 	Pkg, Name         string
 	InPorts, OutPorts []*Port
+	DelayWrite        *Node
 }
 
 type Port struct {
@@ -81,7 +82,19 @@ func NewDelayNode() *Node {
 		Pkg:  nodepkg,
 		Name: "Delay",
 	}
+	n.DelayWrite = n
 	n.InPorts = []*Port{{Node: n}, {Node: n}}
+	n.OutPorts = []*Port{{Out: true, Node: n}}
+	return n
+}
+
+func NewDelayReadNode(delay *Node) *Node {
+	n := &Node{
+		Pkg:        nodepkg,
+		Name:       "Delay",
+		DelayWrite: delay.DelayWrite,
+	}
+	n.InPorts = []*Port{{Node: n}}
 	n.OutPorts = []*Port{{Out: true, Node: n}}
 	return n
 }
@@ -100,9 +113,10 @@ func NewPortNode(out bool) *Node {
 	return n
 }
 
-func IsDelay(n *Node) bool   { return n.Pkg == nodepkg && n.Name == "Delay" }
-func IsInport(n *Node) bool  { return n.Pkg == "" && n.Name == "in" }
-func IsOutport(n *Node) bool { return n.Pkg == "" && n.Name == "out" }
+func (n *Node) IsDelay() bool      { return n.DelayWrite != nil }
+func (n *Node) IsDelayWrite() bool { return n.DelayWrite == n }
+func IsInport(n *Node) bool        { return n.Pkg == "" && n.Name == "in" }
+func IsOutport(n *Node) bool       { return n.Pkg == "" && n.Name == "out" }
 
 func (n *Node) OutPortPos(p *Port) int {
 	for i, p2 := range n.OutPorts {

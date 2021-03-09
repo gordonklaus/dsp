@@ -20,13 +20,14 @@ import (
 type Node struct {
 	node *dsp.Node
 
-	graph     *Graph
-	height    float32
-	target    f32.Point
-	pos       f32.Point
-	focused   bool
-	drag      gesture.Drag
-	dragStart f32.Point
+	graph      *Graph
+	height     float32
+	target     f32.Point
+	pos        f32.Point
+	focused    bool
+	drag       gesture.Drag
+	dragStart  f32.Point
+	delayColor color.NRGBA
 
 	inports, outports []*Port
 }
@@ -56,7 +57,7 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 	}
 
 	y = textHeight + .75*portSize
-	if dsp.IsDelay(n.node) {
+	if n.node.IsDelayWrite() {
 		y += 1.5 * portSize
 	} else if d := maxPorts - len(node.OutPorts); d > 0 {
 		y += .75 * portSize * float32(d)
@@ -73,9 +74,13 @@ func (n *Node) Layout(gtx C) D {
 	size := image.Pt(nodeWidth, int(n.height))
 	rect := image.Rectangle{Max: size}
 
-	if d := n.target.Sub(n.pos); d.X*d.X+d.Y*d.Y > float32(gtx.Px(unit.Dp(1))) && !n.drag.Dragging() {
-		n.pos = n.pos.Add(d.Mul(.1))
-		op.InvalidateOp{}.Add(gtx.Ops)
+	if d := n.target.Sub(n.pos); int(d.X*d.X+d.Y*d.Y) > gtx.Px(unit.Dp(1)) {
+		if !n.drag.Dragging() {
+			n.pos = n.pos.Add(d.Mul(.1))
+			op.InvalidateOp{}.Add(gtx.Ops)
+		}
+	} else {
+		n.pos = n.target
 	}
 
 	for _, e := range gtx.Events(n) {
@@ -99,12 +104,17 @@ func (n *Node) Layout(gtx C) D {
 			if e.Text == "," || e.Text == "<" {
 				if dsp.IsInport(n.node) {
 					n.graph.ports.in.new(n, e.Text == ",")
+					break
 				} else if dsp.IsOutport(n.node) {
 					n.graph.ports.out.new(n, e.Text == ",")
+					break
 				}
-			} else {
-				n.graph.editEvent(e)
+			} else if e.Text == "=" && n.node.IsDelay() {
+				n.graph.addNode(dsp.NewDelayReadNode(n.node))
+				break
 			}
+
+			n.graph.editEvent(e)
 		}
 	}
 
@@ -128,6 +138,15 @@ func (n *Node) Layout(gtx C) D {
 		color.NRGBA{R: 255, G: 255, B: 255, A: 255},
 		clip.Rect(rect).Op(),
 	)
+	if n.delayColor != (color.NRGBA{}) {
+		paint.FillShape(gtx.Ops,
+			n.delayColor,
+			clip.RRect{
+				Rect: f32.Rectangle{Max: f32.Pt(8, 8)},
+				SE:   8,
+			}.Op(gtx.Ops),
+		)
+	}
 	gtx.Constraints.Min = image.Pt(nodeWidth, 20)
 	lbl := material.Body1(th, n.node.Name)
 	lbl.Color = color.NRGBA{A: 255}
@@ -136,7 +155,7 @@ func (n *Node) Layout(gtx C) D {
 		paint.FillShape(gtx.Ops,
 			color.NRGBA{G: 128, B: 255, A: 255},
 			clip.Border{
-				Rect:  layout.FRect(rect),
+				Rect:  layout.FRect(rect.Inset(-2)),
 				Width: 4,
 			}.Op(gtx.Ops),
 		)

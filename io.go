@@ -32,9 +32,14 @@ func (g *Graph) Save() error {
 		}
 	}
 	for i, n := range nodes {
+		delayWrite := 0
+		if n.IsDelay() {
+			delayWrite = nodeIndex[n.DelayWrite] + 1
+		}
 		gg.Nodes = append(gg.Nodes, nodeGob{
-			Pkg:  n.Pkg,
-			Name: n.Name,
+			Pkg:        n.Pkg,
+			Name:       n.Name,
+			DelayWrite: delayWrite,
 		})
 		for pi, p := range n.InPorts {
 			for _, c := range p.Conns {
@@ -74,12 +79,12 @@ func (g *Graph) Save() error {
 	pkgNames := map[string]string{}
 	pkgCounts := map[string]int{}
 	for _, n := range nodes {
-		if n.Pkg != "" {
+		if n.Pkg != "" && pkgNames[n.Pkg] == "" {
 			p := path.Base(n.Pkg)
-			if x := pkgCounts[p]; x > 0 {
+			pkgCounts[p]++
+			if x := pkgCounts[p]; x > 1 {
 				p += strconv.Itoa(x)
 			}
-			pkgCounts[p]++
 			pkgNames[n.Pkg] = p
 		}
 	}
@@ -119,10 +124,10 @@ func (g *Graph) Save() error {
 		}
 
 		name := n.Name
-		if x := fieldCounts[name]; x > 0 {
-			name += strconv.Itoa(x + 1)
-		}
 		fieldCounts[name]++
+		if x := fieldCounts[name]; x > 1 {
+			name += strconv.Itoa(x)
+		}
 		fieldNames[n] = name
 		typ := n.Name
 		if pn, ok := pkgNames[n.Pkg]; ok {
@@ -131,7 +136,7 @@ func (g *Graph) Save() error {
 		fmt.Fprintf(gof, "\t%s %s\n", name, typ)
 	}
 	for _, n := range nodes {
-		if IsDelay(n) {
+		if n.IsDelayWrite() {
 			writeField(n)
 		}
 	}
@@ -174,13 +179,27 @@ func (g *Graph) Save() error {
 		fmt.Fprintf(gof, " float32")
 	}
 	fmt.Fprintf(gof, ") {\n")
+	delayWritten := map[*Node]bool{}
 	for _, n := range nodes[len(g.InPorts) : len(nodes)-len(g.OutPorts)] {
-		if IsDelay(n) {
-			fmt.Fprintf(gof, "\tx.%s.Write(%s)\n", fieldNames[n], getVar(n.InPorts[0]))
+		if n.IsDelay() {
+			if n.IsDelayWrite() {
+				fmt.Fprintf(gof, "\tx.%s.Write(%s)\n", fieldNames[n], getVar(n.InPorts[0]))
+				delayWritten[n] = true
+			}
 			for i, p := range n.OutPorts {
+				fmt.Fprint(gof, "\t")
 				if len(p.Conns) > 0 {
-					fmt.Fprintf(gof, "\t%s := x.%s.Read(%s)\n", newVar(p), fieldNames[n], getVar(n.InPorts[1+i]))
+					fmt.Fprintf(gof, "%s := ", newVar(p))
 				}
+				method := "FeedbackRead"
+				if delayWritten[n.DelayWrite] {
+					method = "Read"
+				}
+				ip := i
+				if n.IsDelayWrite() {
+					ip++
+				}
+				fmt.Fprintf(gof, "x.%s.%s(%s)\n", fieldNames[n.DelayWrite], method, getVar(n.InPorts[ip]))
 			}
 			continue
 		}
@@ -300,6 +319,12 @@ func LoadGraph(name string) (*Graph, error) {
 			g.Nodes = append(g.Nodes, n)
 		}
 	}
+	for i, n := range nodes {
+		if dw := gg.Nodes[i].DelayWrite - 1; dw >= 0 && dw != i {
+			n.InPorts = n.InPorts[1:]
+			n.DelayWrite = nodes[dw]
+		}
+	}
 	for _, c := range gg.Conns {
 		if c.Src >= len(nodes) || c.Dst >= len(nodes) {
 			return nil, fmt.Errorf("src (%d) or dst (%d) out of range (%d)", c.Src, c.Dst, len(nodes))
@@ -364,7 +389,8 @@ type graphGob struct {
 }
 
 type nodeGob struct {
-	Pkg, Name string
+	Pkg, Name  string
+	DelayWrite int
 }
 
 type connGob struct {

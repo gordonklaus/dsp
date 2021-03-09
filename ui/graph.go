@@ -356,6 +356,54 @@ func (g *Graph) arrange() {
 			}
 		}
 	}
+
+	delayCounts := map[*dsp.Node]int{}
+	for _, n := range g.nodes {
+		if n.node.IsDelay() {
+			delayCounts[n.node.DelayWrite]++
+		}
+	}
+	hue := 0.
+	delayColors := map[*dsp.Node]color.NRGBA{}
+	for _, n := range g.nodes {
+		if delayCounts[n.node.DelayWrite] > 1 {
+			if _, ok := delayColors[n.node.DelayWrite]; !ok {
+				delayColors[n.node.DelayWrite] = hsv2rgb(hue, .5, 1)
+				hue = math.Mod(hue+math.Phi, 1)
+			}
+			n.delayColor = delayColors[n.node.DelayWrite]
+		} else {
+			n.delayColor = color.NRGBA{}
+		}
+	}
+}
+
+func hsv2rgb(h, s, v float64) color.NRGBA {
+	c := v * s
+	x := c * (1 - math.Abs(math.Mod(h*6, 2)-1))
+	m := v - c
+
+	var r, g, b float64
+	switch int(h * 6) {
+	case 0:
+		r, g, b = c, x, 0
+	case 1:
+		r, g, b = x, c, 0
+	case 2:
+		r, g, b = 0, c, x
+	case 3:
+		r, g, b = 0, x, c
+	case 4:
+		r, g, b = x, 0, c
+	default:
+		r, g, b = c, 0, x
+	}
+	return color.NRGBA{
+		R: uint8(255 * (r + m)),
+		G: uint8(255 * (g + m)),
+		B: uint8(255 * (b + m)),
+		A: 255,
+	}
 }
 
 func (g *Graph) deleteNode(n *Node) {
@@ -384,6 +432,16 @@ func (g *Graph) deleteNode(n *Node) {
 		del(&g.ports.out.nodes, &g.graph.OutPorts)
 	} else {
 		del(&g.nodes, &g.graph.Nodes)
+	}
+
+	if n.node.IsDelayWrite() {
+		for i := 0; i < len(g.nodes); i++ {
+			n2 := g.nodes[i]
+			if n2.node.DelayWrite == n.node {
+				g.deleteNode(n2)
+				i--
+			}
+		}
 	}
 }
 
