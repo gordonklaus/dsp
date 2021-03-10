@@ -311,9 +311,9 @@ func LoadGraph(name string) (*Graph, error) {
 			return nil, err
 		}
 		nodes[i] = n
-		if IsInport(n) {
+		if n.IsInport() {
 			g.InPorts = append(g.InPorts, n)
-		} else if IsOutport(n) {
+		} else if n.IsOutport() {
 			g.OutPorts = append(g.OutPorts, n)
 		} else {
 			g.Nodes = append(g.Nodes, n)

@@ -83,9 +83,9 @@ func (p *Port) Layout(gtx C) D {
 			}
 		case key.EditEvent:
 			if e.Text == "," || e.Text == "<" {
-				if dsp.IsInport(p.node.node) {
+				if p.node.node.IsInport() {
 					p.node.graph.ports.in.new(p.node, e.Text == ",")
-				} else if dsp.IsOutport(p.node.node) {
+				} else if p.node.node.IsOutport() {
 					p.node.graph.ports.out.new(p.node, e.Text == ",")
 				}
 			} else {

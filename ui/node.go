@@ -102,10 +102,10 @@ func (n *Node) Layout(gtx C) D {
 			}
 		case key.EditEvent:
 			if e.Text == "," || e.Text == "<" {
-				if dsp.IsInport(n.node) {
+				if n.node.IsInport() {
 					n.graph.ports.in.new(n, e.Text == ",")
 					break
-				} else if dsp.IsOutport(n.node) {
+				} else if n.node.IsOutport() {
 					n.graph.ports.out.new(n, e.Text == ",")
 					break
 				}

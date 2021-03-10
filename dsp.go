@@ -115,8 +115,8 @@ func NewPortNode(out bool) *Node {
 
 func (n *Node) IsDelay() bool      { return n.DelayWrite != nil }
 func (n *Node) IsDelayWrite() bool { return n.DelayWrite == n }
-func IsInport(n *Node) bool        { return n.Pkg == "" && n.Name == "in" }
-func IsOutport(n *Node) bool       { return n.Pkg == "" && n.Name == "out" }
+func (n *Node) IsInport() bool     { return n.Pkg == "" && n.Name == "in" }
+func (n *Node) IsOutport() bool    { return n.Pkg == "" && n.Name == "out" }
 
 func (n *Node) OutPortPos(p *Port) int {
 	for i, p2 := range n.OutPorts {

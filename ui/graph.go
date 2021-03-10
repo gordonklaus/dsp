@@ -426,9 +426,9 @@ func (g *Graph) deleteNode(n *Node) {
 			p.conns[0].delete()
 		}
 	}
-	if dsp.IsInport(n.node) {
+	if n.node.IsInport() {
 		del(&g.ports.in.nodes, &g.graph.InPorts)
-	} else if dsp.IsOutport(n.node) {
+	} else if n.node.IsOutport() {
 		del(&g.ports.out.nodes, &g.graph.OutPorts)
 	} else {
 		del(&g.nodes, &g.graph.Nodes)
