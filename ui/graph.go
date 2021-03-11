@@ -122,7 +122,9 @@ func (g *Graph) Layout(gtx C) D {
 	}
 
 	key.InputOp{Tag: g}.Add(gtx.Ops)
-	key.FocusOp{Tag: g.focus}.Add(gtx.Ops)
+	if g.focus != nil {
+		key.FocusOp{Tag: g.focus}.Add(gtx.Ops)
+	}
 	pointer.InputOp{
 		Tag:   g,
 		Types: pointer.Scroll,
@@ -230,7 +232,7 @@ func (pg *portsGroup) new(by *Node, after bool) {
 	nn := NewNode(n, pg.graph)
 	pg.nodes = append(pg.nodes[:i], append([]*Node{nn}, pg.nodes[i:]...)...)
 	pg.graph.arrange()
-	pg.graph.focus = nn
+	nn.edit()
 }
 
 func (pg *portsGroup) layout(gtx C, rect image.Rectangle) {

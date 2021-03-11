@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"go/token"
 	"image"
 	"image/color"
 
@@ -12,8 +13,11 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"gioui.org/x/eventx"
 	"github.com/gordonklaus/dsp"
 )
 
@@ -25,6 +29,8 @@ type Node struct {
 	target     f32.Point
 	pos        f32.Point
 	focused    bool
+	editor     *widget.Editor
+	oldText    string
 	drag       gesture.Drag
 	dragStart  f32.Point
 	delayColor color.NRGBA
@@ -96,6 +102,10 @@ func (n *Node) Layout(gtx C) D {
 					n.graph.deleteNode(n)
 					n.graph.arrange()
 					n.graph.focus = n.graph
+				case key.NameReturn:
+					if n.node.IsInport() || n.node.IsOutport() {
+						n.edit()
+					}
 				case key.NameEscape:
 					n.graph.focus = n.graph
 				}
@@ -148,9 +158,13 @@ func (n *Node) Layout(gtx C) D {
 		)
 	}
 	gtx.Constraints.Min = image.Pt(nodeWidth, 20)
-	lbl := material.Body1(th, n.node.Name)
-	lbl.Color = color.NRGBA{A: 255}
-	layout.Center.Layout(gtx, lbl.Layout)
+	if n.editor != nil {
+		n.layoutEditor(gtx)
+	} else {
+		lbl := material.Body1(th, n.name())
+		lbl.Color = color.NRGBA{A: 255}
+		layout.Center.Layout(gtx, lbl.Layout)
+	}
 	if n.focused {
 		paint.FillShape(gtx.Ops,
 			color.NRGBA{G: 128, B: 255, A: 255},
@@ -166,4 +180,90 @@ func (n *Node) Layout(gtx C) D {
 	}
 
 	return D{Size: size}
+}
+
+func (n *Node) layoutEditor(gtx C) {
+	for _, e := range n.editor.Events() {
+		switch e := e.(type) {
+		case widget.ChangeEvent:
+			n.validateEditor()
+		case widget.SubmitEvent:
+			n.setName(e.Text)
+			n.editor = nil
+			n.graph.arrange()
+			n.graph.focus = n
+			return
+		}
+	}
+
+	spy, gtx := eventx.Enspy(gtx)
+	th := th.WithPalette(material.Palette{
+		Fg: color.NRGBA{A: 255},
+	})
+	layout.Center.Layout(gtx, material.Editor(&th, n.editor, "").Layout)
+
+	for _, e := range spy.AllEvents() {
+		for _, e := range e.Items {
+			switch e := e.(type) {
+			case key.Event:
+				if e.State == key.Press {
+					switch e.Name {
+					case key.NameEscape:
+						n.editor = nil
+						n.graph.focus = n
+					}
+				}
+			}
+		}
+	}
+}
+
+func (n *Node) edit() {
+	n.editor = &widget.Editor{
+		Alignment:  text.Middle,
+		SingleLine: true,
+		Submit:     true,
+	}
+	name := n.name()
+	if name == "" {
+		name = "x"
+	}
+	n.editor.SetText(name)
+	n.editor.SetCaret(0, n.editor.Len())
+	n.editor.Focus()
+	n.graph.focus = nil
+	n.oldText = name
+}
+
+func (n *Node) validateEditor() {
+	if n.node.IsInport() || n.node.IsOutport() {
+		if !token.IsIdentifier(n.editor.Text()) || n.editor.Text() == "_" {
+			if n.editor.Text() == "" {
+				n.editor.SetText("x")
+				n.editor.SetCaret(0, 1)
+			} else {
+				n.editor.SetText(n.oldText)
+			}
+		}
+	}
+	n.oldText = n.editor.Text()
+}
+
+func (n *Node) name() string {
+	if n.node.IsInport() {
+		return n.node.Name[3:]
+	}
+	if n.node.IsOutport() {
+		return n.node.Name[4:]
+	}
+	return n.node.Name
+}
+
+func (n *Node) setName(name string) {
+	if n.node.IsInport() {
+		n.node.Name = "in-" + name
+	}
+	if n.node.IsOutport() {
+		n.node.Name = "out-" + name
+	}
 }

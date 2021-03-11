@@ -100,9 +100,9 @@ func NewDelayReadNode(delay *Node) *Node {
 }
 
 func NewPortNode(out bool) *Node {
-	n := &Node{Name: "in"}
+	n := &Node{Name: "in-"}
 	if out {
-		n.Name = "out"
+		n.Name = "out-"
 	}
 	p := &Port{Out: !out, Node: n}
 	if out {
@@ -115,8 +115,8 @@ func NewPortNode(out bool) *Node {
 
 func (n *Node) IsDelay() bool      { return n.DelayWrite != nil }
 func (n *Node) IsDelayWrite() bool { return n.DelayWrite == n }
-func (n *Node) IsInport() bool     { return n.Pkg == "" && n.Name == "in" }
-func (n *Node) IsOutport() bool    { return n.Pkg == "" && n.Name == "out" }
+func (n *Node) IsInport() bool     { return n.Pkg == "" && strings.HasPrefix(n.Name, "in-") }
+func (n *Node) IsOutport() bool    { return n.Pkg == "" && strings.HasPrefix(n.Name, "out-") }
 
 func (n *Node) OutPortPos(p *Port) int {
 	for i, p2 := range n.OutPorts {
