@@ -4,6 +4,7 @@ import (
 	"go/types"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -68,6 +69,20 @@ func NewNode(o types.Object) *Node {
 	return nil
 }
 
+func NewPortNode(out bool) *Node {
+	n := &Node{Name: "in-"}
+	if out {
+		n.Name = "out-"
+	}
+	p := &Port{Out: !out, Node: n}
+	if out {
+		n.InPorts = []*Port{p}
+	} else {
+		n.OutPorts = []*Port{p}
+	}
+	return n
+}
+
 func NewOperatorNode(op string) *Node {
 	n := &Node{Name: op}
 	n.InPorts = []*Port{{Node: n}, {Node: n}}
@@ -99,24 +114,20 @@ func NewDelayReadNode(delay *Node) *Node {
 	return n
 }
 
-func NewPortNode(out bool) *Node {
-	n := &Node{Name: "in-"}
-	if out {
-		n.Name = "out-"
-	}
-	p := &Port{Out: !out, Node: n}
-	if out {
-		n.InPorts = []*Port{p}
-	} else {
-		n.OutPorts = []*Port{p}
-	}
+func NewConstNode(text string) *Node {
+	n := &Node{Name: text}
+	n.OutPorts = []*Port{{Out: true, Node: n}}
 	return n
 }
 
-func (n *Node) IsDelay() bool      { return n.DelayWrite != nil }
-func (n *Node) IsDelayWrite() bool { return n.DelayWrite == n }
 func (n *Node) IsInport() bool     { return n.Pkg == "" && strings.HasPrefix(n.Name, "in-") }
 func (n *Node) IsOutport() bool    { return n.Pkg == "" && strings.HasPrefix(n.Name, "out-") }
+func (n *Node) IsDelay() bool      { return n.DelayWrite != nil }
+func (n *Node) IsDelayWrite() bool { return n.DelayWrite == n }
+func (n *Node) IsConst() bool {
+	_, err := strconv.ParseFloat(n.Name, 64)
+	return n.Pkg == "" && err == nil
+}
 
 func (n *Node) OutPortPos(p *Port) int {
 	for i, p2 := range n.OutPorts {

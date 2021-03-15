@@ -290,18 +290,22 @@ func (g *Graph) editEvent(e key.EditEvent) {
 	case "=":
 		g.addNode(dsp.NewDelayNode())
 	default:
-		if unicode.IsLetter([]rune(e.Text)[0]) {
+		c := []rune(e.Text)[0]
+		if unicode.IsLetter(c) {
 			g.menu.activate(e)
+		} else if unicode.IsNumber(c) {
+			g.addNode(dsp.NewConstNode(e.Text)).edit()
 		}
 	}
 }
 
-func (g *Graph) addNode(n *dsp.Node) {
+func (g *Graph) addNode(n *dsp.Node) *Node {
 	g.graph.Nodes = append(g.graph.Nodes, n)
 	nn := NewNode(n, g)
 	g.nodes = append(g.nodes, nn)
 	g.arrange()
 	g.focus = nn
+	return nn
 }
 
 func (g *Graph) arrange() {

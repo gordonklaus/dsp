@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"image"
 	"image/color"
+	"strconv"
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
@@ -31,6 +32,7 @@ type Node struct {
 	focused    bool
 	editor     *widget.Editor
 	oldText    string
+	oldCaret   int
 	drag       gesture.Drag
 	dragStart  f32.Point
 	delayColor color.NRGBA
@@ -103,7 +105,7 @@ func (n *Node) Layout(gtx C) D {
 					n.graph.arrange()
 					n.graph.focus = n.graph
 				case key.NameReturn:
-					if n.node.IsInport() || n.node.IsOutport() {
+					if n.node.IsInport() || n.node.IsOutport() || n.node.IsConst() {
 						n.edit()
 					}
 				case key.NameEscape:
@@ -195,10 +197,12 @@ func (n *Node) layoutEditor(gtx C) {
 			return
 		}
 	}
+	_, n.oldCaret = n.editor.CaretPos()
 
 	spy, gtx := eventx.Enspy(gtx)
 	th := th.WithPalette(material.Palette{
-		Fg: color.NRGBA{A: 255},
+		Fg:         color.NRGBA{A: 255},
+		ContrastBg: color.NRGBA{R: 128, G: 196, B: 196, A: 255},
 	})
 	layout.Center.Layout(gtx, material.Editor(&th, n.editor, "").Layout)
 
@@ -229,10 +233,11 @@ func (n *Node) edit() {
 		name = "x"
 	}
 	n.editor.SetText(name)
-	n.editor.SetCaret(0, n.editor.Len())
+	n.editor.SetCaret(n.editor.Len(), n.editor.Len())
 	n.editor.Focus()
 	n.graph.focus = nil
 	n.oldText = name
+	_, n.oldCaret = n.editor.CaretPos()
 }
 
 func (n *Node) validateEditor() {
@@ -243,6 +248,17 @@ func (n *Node) validateEditor() {
 				n.editor.SetCaret(0, 1)
 			} else {
 				n.editor.SetText(n.oldText)
+				n.editor.SetCaret(n.oldCaret, n.oldCaret)
+			}
+		}
+	} else if n.node.IsConst() {
+		if _, err := strconv.ParseFloat(n.editor.Text(), 64); err != nil {
+			if n.editor.Text() == "" {
+				n.editor.SetText("0")
+				n.editor.SetCaret(0, 1)
+			} else {
+				n.editor.SetText(n.oldText)
+				n.editor.SetCaret(n.oldCaret, n.oldCaret)
 			}
 		}
 	}
@@ -266,4 +282,5 @@ func (n *Node) setName(name string) {
 	if n.node.IsOutport() {
 		n.node.Name = "out-" + name
 	}
+	n.node.Name = name
 }

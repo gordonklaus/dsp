@@ -184,6 +184,13 @@ func (g *Graph) Save() error {
 	fmt.Fprintf(gof, ") {\n")
 	delayWritten := map[*Node]bool{}
 	for _, n := range nodes[len(g.InPorts) : len(nodes)-len(g.OutPorts)] {
+		if n.IsConst() {
+			if len(n.OutPorts[0].Conns) > 0 {
+				fmt.Fprintf(gof, "\tconst %s float32 = %s\n", newVar(n.OutPorts[0], "c"), n.Name)
+			}
+			continue
+		}
+
 		if n.IsDelay() {
 			if n.IsDelayWrite() {
 				fmt.Fprintf(gof, "\tthis.%s.Write(%s)\n", fieldNames[n], getVar(n.InPorts[0]))
@@ -387,6 +394,9 @@ func newNode(pkg, name string) (*Node, error) {
 	switch name {
 	case "+", "-", "*", "/":
 		return NewOperatorNode(name), nil
+	}
+	if _, err := strconv.ParseFloat(name, 64); err == nil {
+		return NewConstNode(name), nil
 	}
 	return nil, fmt.Errorf("unknown node %q", name)
 }
