@@ -130,27 +130,9 @@ func (g *Graph) Layout(gtx C) D {
 		Types: pointer.Scroll,
 	}.Add(gtx.Ops)
 
-	m := op.Record(gtx.Ops)
-	borderRect := image.ZR
-	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
-		d := n.Layout(gtx)
-		borderRect = borderRect.Union(image.Rectangle{Max: d.Size}.Add(image.Pt(int(n.pos.X), int(n.pos.Y))))
-	}
-	borderRect = borderRect.Inset(-32)
-	if len(g.graph.InPorts) > 0 {
-		borderRect.Min.X += 96
-		if len(g.graph.OutPorts) == 0 {
-			borderRect.Max.X += 96
-		}
-	}
-	if len(g.graph.OutPorts) > 0 {
-		borderRect.Max.X -= 96
-		if len(g.graph.InPorts) == 0 {
-			borderRect.Min.X -= 96
-		}
-	}
+	layoutNodes, borderRect := g.recordNodeLayout(gtx)
+
 	g.constrainOffset(gtx, borderRect)
-	layoutNodes := m.Stop()
 
 	paint.Fill(gtx.Ops, color.NRGBA{A: 255})
 
@@ -181,6 +163,31 @@ func (g *Graph) Layout(gtx C) D {
 	}
 
 	return D{Size: gtx.Constraints.Min}
+}
+
+func (g *Graph) recordNodeLayout(gtx C) (op.CallOp, image.Rectangle) {
+	m := op.Record(gtx.Ops)
+	r := image.ZR
+	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
+		d := n.Layout(gtx)
+		r = r.Union(image.Rectangle{Max: d.Size}.Add(image.Pt(int(n.pos.X), int(n.pos.Y))))
+	}
+	r = r.Inset(-32)
+	r.Min.X -= 32
+	r.Max.X += 32
+	if len(g.graph.InPorts) > 0 {
+		r.Min.X += 128
+		if len(g.graph.OutPorts) == 0 {
+			r.Max.X += 64
+		}
+	}
+	if len(g.graph.OutPorts) > 0 {
+		r.Max.X -= 128
+		if len(g.graph.InPorts) == 0 {
+			r.Min.X -= 64
+		}
+	}
+	return m.Stop(), r
 }
 
 func (g *Graph) constrainOffset(gtx C, borderRect image.Rectangle) {
