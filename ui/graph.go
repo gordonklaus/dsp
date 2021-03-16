@@ -149,8 +149,8 @@ func (g *Graph) Layout(gtx C) D {
 			borderRect.Min.X -= 96
 		}
 	}
-	g.constraintOffset(gtx, borderRect)
-	call := m.Stop()
+	g.constrainOffset(gtx, borderRect)
+	layoutNodes := m.Stop()
 
 	paint.Fill(gtx.Ops, color.NRGBA{A: 255})
 
@@ -171,7 +171,7 @@ func (g *Graph) Layout(gtx C) D {
 	for _, c := range g.conns {
 		c.Layout(gtx)
 	}
-	call.Add(gtx.Ops)
+	layoutNodes.Add(gtx.Ops)
 	g.ports.in.layout(gtx, borderRect)
 	g.ports.out.layout(gtx, borderRect)
 	st.Load()
@@ -183,7 +183,7 @@ func (g *Graph) Layout(gtx C) D {
 	return D{Size: gtx.Constraints.Min}
 }
 
-func (g *Graph) constraintOffset(gtx C, borderRect image.Rectangle) {
+func (g *Graph) constrainOffset(gtx C, borderRect image.Rectangle) {
 	rect := (image.Rectangle{Max: gtx.Constraints.Min}).Sub(image.Pt(int(g.offset.X), int(g.offset.Y)))
 	marginRect := borderRect.Inset(-128)
 	if marginRect.Dx() < rect.Dx() {

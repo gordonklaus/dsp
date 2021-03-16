@@ -70,9 +70,9 @@ func NewNode(o types.Object) *Node {
 }
 
 func NewPortNode(out bool) *Node {
-	n := &Node{Name: "in-"}
+	n := &Node{Name: "in-x"}
 	if out {
-		n.Name = "out-"
+		n.Name = "out-x"
 	}
 	p := &Port{Out: !out, Node: n}
 	if out {

@@ -229,9 +229,6 @@ func (n *Node) edit() {
 		Submit:     true,
 	}
 	name := n.name()
-	if name == "" {
-		name = "x"
-	}
 	n.editor.SetText(name)
 	n.editor.SetCaret(n.editor.Len(), n.editor.Len())
 	n.editor.Focus()
@@ -278,9 +275,9 @@ func (n *Node) name() string {
 func (n *Node) setName(name string) {
 	if n.node.IsInport() {
 		n.node.Name = "in-" + name
-	}
-	if n.node.IsOutport() {
+	} else if n.node.IsOutport() {
 		n.node.Name = "out-" + name
+	} else {
+		n.node.Name = name
 	}
-	n.node.Name = name
 }
