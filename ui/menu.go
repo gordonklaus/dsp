@@ -35,30 +35,6 @@ type menuItem struct {
 	obj       types.Object
 }
 
-func (it *menuItem) Layout(gtx C, selected bool) D {
-	text := it.pkg
-	if it.name != "" {
-		if text != "" {
-			text += "."
-		}
-		text += it.name
-	}
-	lbl := material.Body1(th, text)
-	lbl.MaxLines = 1
-	if !selected {
-		return lbl.Layout(gtx)
-	}
-
-	return layout.Stack{}.Layout(gtx,
-		layout.Expanded(func(gtx C) D {
-			size := gtx.Constraints.Min
-			paint.FillShape(gtx.Ops, th.ContrastBg, clip.Rect{Max: size}.Op())
-			return D{Size: size}
-		}),
-		layout.Stacked(lbl.Layout),
-	)
-}
-
 func NewMenu() *Menu {
 	items := initItems()
 	return &Menu{
@@ -179,32 +155,6 @@ func (m *Menu) expandPackage(item *menuItem) {
 	m.selectedItem = m.filteredItems[0]
 }
 
-func (m *Menu) moveSelection(next bool) {
-	for i, it := range m.filteredItems {
-		if it == m.selectedItem {
-			i--
-			if next {
-				i += 2
-			}
-			i = (i + len(m.filteredItems)) % len(m.filteredItems)
-			m.selectedItem = m.filteredItems[i]
-
-			if p := &m.list.Position; i <= p.First {
-				p.First = i
-				p.Offset = 0
-			} else if p.First <= i-(p.Count-1) {
-				p.First = i - (p.Count - 1)
-				if p.Offset > 0 {
-					p.First++
-				}
-				p.Offset = 0
-			}
-
-			break
-		}
-	}
-}
-
 func (m *Menu) Layout(gtx C) *dsp.Node {
 	if !m.active {
 		return nil
@@ -297,4 +247,54 @@ func (m *Menu) layoutEditor(gtx C) D {
 	}
 
 	return dims
+}
+
+func (it *menuItem) Layout(gtx C, selected bool) D {
+	text := it.pkg
+	if it.name != "" {
+		if text != "" {
+			text += "."
+		}
+		text += it.name
+	}
+	lbl := material.Body1(th, text)
+	lbl.MaxLines = 1
+	if !selected {
+		return lbl.Layout(gtx)
+	}
+
+	return layout.Stack{}.Layout(gtx,
+		layout.Expanded(func(gtx C) D {
+			size := gtx.Constraints.Min
+			paint.FillShape(gtx.Ops, th.ContrastBg, clip.Rect{Max: size}.Op())
+			return D{Size: size}
+		}),
+		layout.Stacked(lbl.Layout),
+	)
+}
+
+func (m *Menu) moveSelection(next bool) {
+	for i, it := range m.filteredItems {
+		if it == m.selectedItem {
+			i--
+			if next {
+				i += 2
+			}
+			i = (i + len(m.filteredItems)) % len(m.filteredItems)
+			m.selectedItem = m.filteredItems[i]
+
+			if p := &m.list.Position; i <= p.First {
+				p.First = i
+				p.Offset = 0
+			} else if p.First <= i-(p.Count-1) {
+				p.First = i - (p.Count - 1)
+				if p.Offset > 0 {
+					p.First++
+				}
+				p.Offset = 0
+			}
+
+			break
+		}
+	}
 }

@@ -67,7 +67,7 @@ func (g *Graph) loadGraph(name string) error {
 		g.nodes = append(g.nodes, NewNode(n, g))
 	}
 	connConns := map[*dsp.Connection]*Connection{}
-	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
+	for _, n := range g.allNodes() {
 		for _, p := range n.inports {
 			for _, c := range p.port.Conns {
 				cc, ok := connConns[c]
@@ -171,7 +171,7 @@ const layerGap = 128
 func (g *Graph) recordNodeLayout(gtx C) (op.CallOp, image.Rectangle) {
 	m := op.Record(gtx.Ops)
 	r := image.ZR
-	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
+	for _, n := range g.allNodes() {
 		d := n.Layout(gtx)
 		pos := pxpt(gtx, n.pos)
 		r = r.Union(image.Rectangle{Max: d.Size}.Add(image.Pt(int(pos.X), int(pos.Y))))
@@ -322,6 +322,45 @@ func (g *Graph) addNode(n *dsp.Node) *Node {
 	return nn
 }
 
+func (g *Graph) deleteNode(n *Node) {
+	del := func(nodes *[]*Node, nnodes *[]*dsp.Node) {
+		for i, n2 := range *nodes {
+			if n2 == n {
+				*nodes = append((*nodes)[:i], (*nodes)[i+1:]...)
+				break
+			}
+		}
+		for i, n2 := range *nnodes {
+			if n2 == n.node {
+				*nnodes = append((*nnodes)[:i], (*nnodes)[i+1:]...)
+				break
+			}
+		}
+	}
+	for _, p := range append(n.inports, n.outports...) {
+		for len(p.conns) > 0 {
+			p.conns[0].delete()
+		}
+	}
+	if n.node.IsInport() {
+		del(&g.ports.in.nodes, &g.graph.InPorts)
+	} else if n.node.IsOutport() {
+		del(&g.ports.out.nodes, &g.graph.OutPorts)
+	} else {
+		del(&g.nodes, &g.graph.Nodes)
+	}
+
+	if n.node.IsDelayWrite() {
+		for i := 0; i < len(g.nodes); i++ {
+			n2 := g.nodes[i]
+			if n2.node.DelayWrite == n.node {
+				g.deleteNode(n2)
+				i--
+			}
+		}
+	}
+}
+
 func (g *Graph) arrange() {
 	if g.graph.Name != "" {
 		if err := g.graph.Save(); err != nil {
@@ -331,7 +370,7 @@ func (g *Graph) arrange() {
 
 	layers, fakeConns := g.graph.Arrange()
 	nodeNodes := map[*dsp.Node]*Node{}
-	for _, n := range append(append(g.ports.in.nodes, g.nodes...), g.ports.out.nodes...) {
+	for _, n := range g.allNodes() {
 		nodeNodes[n.node] = n
 	}
 	for _, c := range g.conns {
@@ -427,45 +466,6 @@ func hsv2rgb(h, s, v float64) color.NRGBA {
 	}
 }
 
-func (g *Graph) deleteNode(n *Node) {
-	del := func(nodes *[]*Node, nnodes *[]*dsp.Node) {
-		for i, n2 := range *nodes {
-			if n2 == n {
-				*nodes = append((*nodes)[:i], (*nodes)[i+1:]...)
-				break
-			}
-		}
-		for i, n2 := range *nnodes {
-			if n2 == n.node {
-				*nnodes = append((*nnodes)[:i], (*nnodes)[i+1:]...)
-				break
-			}
-		}
-	}
-	for _, p := range append(n.inports, n.outports...) {
-		for len(p.conns) > 0 {
-			p.conns[0].delete()
-		}
-	}
-	if n.node.IsInport() {
-		del(&g.ports.in.nodes, &g.graph.InPorts)
-	} else if n.node.IsOutport() {
-		del(&g.ports.out.nodes, &g.graph.OutPorts)
-	} else {
-		del(&g.nodes, &g.graph.Nodes)
-	}
-
-	if n.node.IsDelayWrite() {
-		for i := 0; i < len(g.nodes); i++ {
-			n2 := g.nodes[i]
-			if n2.node.DelayWrite == n.node {
-				g.deleteNode(n2)
-				i--
-			}
-		}
-	}
-}
-
 func (g *Graph) focusNearest(pt f32.Point, dir string) {
 	all := g.allPorts()
 	if len(g.ports.in.nodes) == 0 {
@@ -483,9 +483,13 @@ type positioner interface {
 	position() f32.Point
 }
 
+func (g *Graph) allNodes() []*Node {
+	return append(append(g.ports.in.nodes, g.nodes...), g.ports.out.nodes...)
+}
+
 func (g *Graph) allPorts() []positioner {
 	var ports []positioner
-	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
+	for _, n := range g.allNodes() {
 		for _, p := range append(n.inports, n.outports...) {
 			ports = append(ports, p)
 		}
