@@ -34,7 +34,7 @@ func NewPort(port *dsp.Port, node *Node, pos f32.Point) *Port {
 const portSize = 16
 
 func (p *Port) Layout(gtx C) D {
-	size := image.Pt(portSize, portSize)
+	size := image.Pt(px(gtx, portSize), px(gtx, portSize))
 	rect := image.Rectangle{Max: size}
 
 	for _, e := range gtx.Events(p) {
@@ -95,9 +95,9 @@ func (p *Port) Layout(gtx C) D {
 	}
 
 	defer op.Save(gtx.Ops).Load()
-	op.Offset(p.pos.Sub(layout.FPt(size).Mul(.5))).Add(gtx.Ops)
+	op.Offset(pxpt(gtx, p.pos).Sub(layout.FPt(size).Mul(.5))).Add(gtx.Ops)
 
-	const r = portSize / 2
+	r := float32(size.X) / 2
 	paint.FillShape(gtx.Ops,
 		color.NRGBA{R: 0, G: 0, B: 0, A: 255},
 		clip.UniformRRect(layout.FRect(rect), r).Op(gtx.Ops),
@@ -107,7 +107,7 @@ func (p *Port) Layout(gtx C) D {
 			color.NRGBA{G: 128, B: 255, A: 255},
 			clip.Border{
 				Rect:  layout.FRect(rect),
-				Width: 4,
+				Width: float32(px(gtx, 4)),
 				SE:    r, SW: r, NW: r, NE: r,
 			}.Op(gtx.Ops),
 		)

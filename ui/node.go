@@ -15,7 +15,6 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/text"
-	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"gioui.org/x/eventx"
@@ -48,11 +47,14 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 		graph: graph,
 	}
 
+	textHeight := float32(material.Body1(th, "x").Layout(C{
+		Constraints: layout.Constraints{Max: image.Pt(1000, 1000)},
+		Ops:         new(op.Ops),
+	}).Size.Y)
 	maxPorts := len(node.InPorts)
 	if maxPorts < len(node.OutPorts) {
 		maxPorts = len(node.OutPorts)
 	}
-	const textHeight = 20
 	n.height = textHeight + 1.5*portSize*float32(maxPorts)
 
 	y := textHeight + float32(.75*portSize)
@@ -79,10 +81,10 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 }
 
 func (n *Node) Layout(gtx C) D {
-	size := image.Pt(nodeWidth, int(n.height))
+	size := image.Pt(px(gtx, nodeWidth), px(gtx, n.height))
 	rect := image.Rectangle{Max: size}
 
-	if d := n.target.Sub(n.pos); int(d.X*d.X+d.Y*d.Y) > gtx.Px(unit.Dp(1)) {
+	if d := n.target.Sub(n.pos); d.X*d.X+d.Y*d.Y > 1 {
 		if !n.drag.Dragging() {
 			n.pos = n.pos.Add(d.Mul(.1))
 			op.InvalidateOp{}.Add(gtx.Ops)
@@ -140,7 +142,7 @@ func (n *Node) Layout(gtx C) D {
 	}
 
 	defer op.Save(gtx.Ops).Load()
-	op.Offset(n.pos).Add(gtx.Ops)
+	op.Offset(pxpt(gtx, n.pos)).Add(gtx.Ops)
 
 	key.InputOp{Tag: n}.Add(gtx.Ops)
 	pointer.Rect(rect).Add(gtx.Ops)
@@ -151,28 +153,29 @@ func (n *Node) Layout(gtx C) D {
 		clip.Rect(rect).Op(),
 	)
 	if n.delayColor != (color.NRGBA{}) {
+		r := float32(px(gtx, 8))
 		paint.FillShape(gtx.Ops,
 			n.delayColor,
 			clip.RRect{
-				Rect: f32.Rectangle{Max: f32.Pt(8, 8)},
-				SE:   8,
+				Rect: f32.Rectangle{Max: f32.Pt(r, r)},
+				SE:   r,
 			}.Op(gtx.Ops),
 		)
 	}
-	gtx.Constraints.Min = image.Pt(nodeWidth, 20)
+	gtx.Constraints.Min = size
 	if n.editor != nil {
 		n.layoutEditor(gtx)
 	} else {
 		lbl := material.Body1(th, n.name())
 		lbl.Color = color.NRGBA{A: 255}
-		layout.Center.Layout(gtx, lbl.Layout)
+		layout.N.Layout(gtx, lbl.Layout)
 	}
 	if n.focused {
 		paint.FillShape(gtx.Ops,
 			color.NRGBA{G: 128, B: 255, A: 255},
 			clip.Border{
-				Rect:  layout.FRect(rect.Inset(-2)),
-				Width: 4,
+				Rect:  layout.FRect(rect.Inset(px(gtx, -2))),
+				Width: float32(px(gtx, 4)),
 			}.Op(gtx.Ops),
 		)
 	}
@@ -204,7 +207,7 @@ func (n *Node) layoutEditor(gtx C) {
 		Fg:         color.NRGBA{A: 255},
 		ContrastBg: color.NRGBA{R: 128, G: 196, B: 196, A: 255},
 	})
-	layout.Center.Layout(gtx, material.Editor(&th, n.editor, "").Layout)
+	layout.N.Layout(gtx, material.Editor(&th, n.editor, "").Layout)
 
 	for _, e := range spy.AllEvents() {
 		for _, e := range e.Items {

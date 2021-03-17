@@ -156,21 +156,21 @@ func (c *Connection) Layout(gtx C) {
 
 	path := clip.Path{}
 	path.Begin(gtx.Ops)
-	path.MoveTo(c.srcPt())
-	if !c.editing {
-		for _, p := range c.via {
-			path.Cube(f32.Pt(64, 0), p.Sub(f32.Pt(64, 0)).Sub(path.Pos()), p.Sub(path.Pos()))
-		}
-	}
-	if c.editing && *c.focusedPort() == nil {
-		path.LineTo(c.dstPt())
+	path.MoveTo(pxpt(gtx, c.srcPt()))
+	if c.editing {
+		path.LineTo(pxpt(gtx, c.dstPt()))
 	} else {
-		path.Cube(f32.Pt(64, 0), c.dstPt().Sub(f32.Pt(64, 0)).Sub(path.Pos()), c.dstPt().Sub(path.Pos()))
+		ctrl := pxpt(gtx, f32.Pt(64, 0))
+		for _, p := range append(c.via, c.dstPt()) {
+			p = pxpt(gtx, p)
+			p2 := p.Sub(path.Pos())
+			path.Cube(ctrl, p2.Sub(ctrl), p2)
+		}
 	}
 	clip.Stroke{
 		Path: path.End(),
 		Style: clip.StrokeStyle{
-			Width: 2,
+			Width: float32(px(gtx, 2)),
 			Cap:   clip.RoundCap,
 		},
 	}.Op().Add(gtx.Ops)
@@ -184,8 +184,8 @@ func (c *Connection) Layout(gtx C) {
 			col1, col2 = col2, col1
 		}
 		paint.LinearGradientOp{
-			Stop1:  c.srcPt(),
-			Stop2:  c.dstPt(),
+			Stop1:  pxpt(gtx, c.srcPt()),
+			Stop2:  pxpt(gtx, c.dstPt()),
 			Color1: col1,
 			Color2: col2,
 		}.Add(gtx.Ops)

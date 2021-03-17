@@ -108,7 +108,8 @@ func (g *Graph) Layout(gtx C) D {
 			if e.State == key.Press {
 				switch e.Name {
 				case key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow:
-					g.focusNearest(layout.FPt(gtx.Constraints.Min).Mul(.5).Sub(g.offset), e.Name)
+					center := layout.FPt(gtx.Constraints.Min).Mul(.5).Sub(g.offset)
+					g.focusNearest(dppt(gtx, center), e.Name)
 				}
 			}
 		case key.EditEvent:
@@ -131,7 +132,6 @@ func (g *Graph) Layout(gtx C) D {
 	}.Add(gtx.Ops)
 
 	layoutNodes, borderRect := g.recordNodeLayout(gtx)
-
 	g.constrainOffset(gtx, borderRect)
 
 	paint.Fill(gtx.Ops, color.NRGBA{A: 255})
@@ -142,12 +142,13 @@ func (g *Graph) Layout(gtx C) D {
 	if g.focused {
 		col = color.NRGBA{G: 128, B: 255, A: 255}
 	}
+	r := float32(px(gtx, 4))
 	paint.FillShape(gtx.Ops,
 		col,
 		clip.Border{
 			Rect:  layout.FRect(borderRect),
-			Width: 4,
-			SE:    4, SW: 4, NW: 4, NE: 4,
+			Width: r,
+			SE:    r, SW: r, NW: r, NE: r,
 		}.Op(gtx.Ops),
 	)
 	for _, c := range g.conns {
@@ -165,34 +166,38 @@ func (g *Graph) Layout(gtx C) D {
 	return D{Size: gtx.Constraints.Min}
 }
 
+const layerGap = 128
+
 func (g *Graph) recordNodeLayout(gtx C) (op.CallOp, image.Rectangle) {
 	m := op.Record(gtx.Ops)
 	r := image.ZR
 	for _, n := range append(append(g.nodes, g.ports.in.nodes...), g.ports.out.nodes...) {
 		d := n.Layout(gtx)
-		r = r.Union(image.Rectangle{Max: d.Size}.Add(image.Pt(int(n.pos.X), int(n.pos.Y))))
+		pos := pxpt(gtx, n.pos)
+		r = r.Union(image.Rectangle{Max: d.Size}.Add(image.Pt(int(pos.X), int(pos.Y))))
 	}
-	r = r.Inset(-32)
-	r.Min.X -= 32
-	r.Max.X += 32
+
+	marginX := px(gtx, layerGap)
+	marginY := px(gtx, 32)
+	nodeWidth := px(gtx, nodeWidth)
 	if len(g.graph.InPorts) > 0 {
-		r.Min.X += 128
-		if len(g.graph.OutPorts) == 0 {
-			r.Max.X += 64
-		}
+		r.Min.X += nodeWidth
+	} else {
+		r.Min.X -= marginX
 	}
 	if len(g.graph.OutPorts) > 0 {
-		r.Max.X -= 128
-		if len(g.graph.InPorts) == 0 {
-			r.Min.X -= 64
-		}
+		r.Max.X -= nodeWidth
+	} else if len(g.graph.InPorts) > 0 || len(g.nodes) > 0 {
+		r.Max.X += marginX
 	}
+	r.Min.Y -= marginY
+	r.Max.Y += marginY
 	return m.Stop(), r
 }
 
 func (g *Graph) constrainOffset(gtx C, borderRect image.Rectangle) {
-	rect := (image.Rectangle{Max: gtx.Constraints.Min}).Sub(image.Pt(int(g.offset.X), int(g.offset.Y)))
-	marginRect := borderRect.Inset(-128)
+	rect := image.Rectangle{Max: gtx.Constraints.Min}.Sub(image.Pt(int(g.offset.X), int(g.offset.Y)))
+	marginRect := borderRect.Inset(px(gtx, -128))
 	if marginRect.Dx() < rect.Dx() {
 		g.offset.X = float32(rect.Dx()/2 - (marginRect.Max.X+marginRect.Min.X)/2)
 	} else if marginRect.Min.X > rect.Min.X {
@@ -266,23 +271,25 @@ func (pg *portsGroup) layout(gtx C, rect image.Rectangle) {
 	}
 
 	if len(pg.nodes) == 0 {
-		pt := image.Pt(rect.Min.X, (rect.Max.Y+rect.Min.Y)/2)
+		frect := layout.FRect(rect)
+		pt := f32.Pt(frect.Min.X, (frect.Max.Y+frect.Min.Y)/2)
 		if pg.out {
-			pt.X = rect.Max.X
+			pt.X = frect.Max.X
 		}
-		pg.pos = layout.FPt(pt)
-		const rr = 8
-		r := image.Rectangle{Min: pt, Max: pt}.Inset(-rr)
+		pg.pos = pt
+
 		col := color.NRGBA{R: 128, G: 128, B: 128, A: 255}
 		if pg.focused {
 			col = color.NRGBA{G: 128, B: 255, A: 255}
 		}
+		r := float32(px(gtx, 8))
+		rr := f32.Pt(r, r)
 		paint.FillShape(gtx.Ops,
 			col,
 			clip.Border{
-				Rect:  layout.FRect(r),
-				Width: 2,
-				SE:    rr, SW: rr, NW: rr, NE: rr,
+				Rect:  f32.Rectangle{Min: pt.Sub(rr), Max: pt.Add(rr)},
+				Width: float32(px(gtx, 2)),
+				SE:    r, SW: r, NW: r, NE: r,
 			}.Op(gtx.Ops),
 		)
 	}
@@ -331,7 +338,8 @@ func (g *Graph) arrange() {
 		c.via = nil
 	}
 	for i, l := range layers {
-		x := 192 * (float32(i) - float32(len(layers))/2)
+		const layerWidth = nodeWidth + layerGap
+		x := layerWidth * (float32(i) - float32(len(layers))/2)
 		height := 0
 		ys := make([]int, len(l))
 		for i, n := range l {
