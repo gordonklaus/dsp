@@ -2,7 +2,6 @@ package ui
 
 import (
 	"image"
-	"image/color"
 	"math"
 
 	"gioui.org/f32"
@@ -99,12 +98,12 @@ func (p *Port) Layout(gtx C) D {
 
 	r := float32(size.X) / 2
 	paint.FillShape(gtx.Ops,
-		color.NRGBA{R: 0, G: 0, B: 0, A: 255},
+		black,
 		clip.UniformRRect(layout.FRect(rect), r).Op(gtx.Ops),
 	)
 	if p.focused {
 		paint.FillShape(gtx.Ops,
-			color.NRGBA{G: 128, B: 255, A: 255},
+			blue,
 			clip.Border{
 				Rect:  layout.FRect(rect),
 				Width: float32(px(gtx, 4)),

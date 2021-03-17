@@ -2,7 +2,7 @@ package ui
 
 import (
 	"go/types"
-	"image/color"
+	"image"
 	"log"
 	"os"
 	"sort"
@@ -36,37 +36,26 @@ type menuItem struct {
 }
 
 func (it *menuItem) Layout(gtx C, selected bool) D {
+	text := it.pkg
+	if it.name != "" {
+		if text != "" {
+			text += "."
+		}
+		text += it.name
+	}
+	lbl := material.Body1(th, text)
+	lbl.MaxLines = 1
+	if !selected {
+		return lbl.Layout(gtx)
+	}
+
 	return layout.Stack{}.Layout(gtx,
 		layout.Expanded(func(gtx C) D {
-			if !selected {
-				return D{}
-			}
 			size := gtx.Constraints.Min
-			paint.FillShape(gtx.Ops, color.NRGBA{R: 32, G: 0, B: 128, A: 255}, clip.Rect{Max: size}.Op())
+			paint.FillShape(gtx.Ops, th.ContrastBg, clip.Rect{Max: size}.Op())
 			return D{Size: size}
 		}),
-		layout.Stacked(func(gtx C) D {
-			children := []layout.FlexChild{}
-			if it.pkg != "" {
-				pkg := it.pkg
-				if it.name != "" {
-					pkg += "."
-				}
-				lbl := material.Body1(th, pkg)
-				lbl.MaxLines = 1
-				children = append(children, layout.Rigid(lbl.Layout))
-			}
-			if it.name != "" {
-				lbl := material.Body1(th, it.name)
-				lbl.Color = color.NRGBA{G: 255, A: 255}
-				lbl.MaxLines = 1
-				children = append(children, layout.Rigid(lbl.Layout))
-			}
-			children = append(children, layout.Flexed(1, func(gtx C) D {
-				return D{Size: gtx.Constraints.Min}
-			}))
-			return layout.Flex{}.Layout(gtx, children...)
-		}),
+		layout.Stacked(lbl.Layout),
 	)
 }
 
@@ -246,35 +235,45 @@ func (m *Menu) Layout(gtx C) *dsp.Node {
 		layout.Rigid(func(gtx C) D {
 			return D{
 				Size:     gtx.Constraints.Min,
-				Baseline: gtx.Constraints.Min.Y / 2,
+				Baseline: 2 * gtx.Constraints.Min.Y / 3,
 			}
 		}),
 		layout.Rigid(func(gtx C) D {
-			dims := widget.Border{
-				Color:        color.NRGBA{255, 255, 255, 255},
-				CornerRadius: unit.Dp(4),
-				Width:        unit.Dp(1),
-			}.Layout(gtx, func(gtx C) D {
-				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
-					gtx.Constraints.Min.X = gtx.Px(unit.Sp(256))
-					gtx.Constraints.Max.X = gtx.Px(unit.Sp(256))
-					gtx.Constraints.Min.Y = 0
-					gtx.Constraints.Max.Y /= 2
-					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-						layout.Rigid(m.layoutEditor),
-						layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
-						layout.Rigid(func(gtx C) D {
-							itemHeight := (&menuItem{pkg: " "}).Layout(gtx, false).Size.Y
-							gtx.Constraints.Max.Y -= gtx.Constraints.Max.Y % itemHeight
-							return m.list.Layout(gtx, len(m.filteredItems), func(gtx C, i int) D {
-								it := m.filteredItems[i]
-								return it.Layout(gtx, it == m.selectedItem)
-							})
-						}),
-					)
-				})
-			})
-			dims.Baseline = dims.Size.Y - 32 // TODO: figure out how to propagate baseline from editor outwards to here
+			dims := layout.Stack{}.Layout(gtx,
+				layout.Expanded(func(gtx C) D {
+					return widget.Border{
+						Color:        blue,
+						CornerRadius: unit.Dp(4),
+						Width:        unit.Dp(2),
+					}.Layout(gtx, func(gtx C) D {
+						rect := layout.FRect(image.Rectangle{Max: gtx.Constraints.Min}.Inset(px(gtx, 1)))
+						r := float32(px(gtx, 4))
+						paint.FillShape(gtx.Ops, white, clip.UniformRRect(rect, r).Op(gtx.Ops))
+						return D{Size: gtx.Constraints.Min}
+					})
+				}),
+				layout.Stacked(func(gtx C) D {
+					return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
+						gtx.Constraints.Min.X = gtx.Px(unit.Sp(256))
+						gtx.Constraints.Max.X = gtx.Px(unit.Sp(256))
+						gtx.Constraints.Min.Y = 0
+						gtx.Constraints.Max.Y /= 2
+						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							layout.Rigid(m.layoutEditor),
+							layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
+							layout.Rigid(func(gtx C) D {
+								itemHeight := (&menuItem{pkg: " "}).Layout(gtx, false).Size.Y
+								gtx.Constraints.Max.Y -= gtx.Constraints.Max.Y % itemHeight
+								return m.list.Layout(gtx, len(m.filteredItems), func(gtx C, i int) D {
+									it := m.filteredItems[i]
+									return it.Layout(gtx, it == m.selectedItem)
+								})
+							}),
+						)
+					})
+				}),
+			)
+			dims.Baseline = dims.Size.Y // TODO: figure out how to propagate baseline from editor outwards to here
 			return dims
 		}),
 	)

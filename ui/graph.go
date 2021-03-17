@@ -134,13 +134,13 @@ func (g *Graph) Layout(gtx C) D {
 	layoutNodes, borderRect := g.recordNodeLayout(gtx)
 	g.constrainOffset(gtx, borderRect)
 
-	paint.Fill(gtx.Ops, color.NRGBA{A: 255})
+	paint.Fill(gtx.Ops, black)
 
 	st := op.Save(gtx.Ops)
 	op.Offset(g.offset).Add(gtx.Ops)
-	col := color.NRGBA{R: 128, G: 128, B: 128, A: 255}
+	col := gray
 	if g.focused {
-		col = color.NRGBA{G: 128, B: 255, A: 255}
+		col = blue
 	}
 	r := float32(px(gtx, 4))
 	paint.FillShape(gtx.Ops,
@@ -278,9 +278,9 @@ func (pg *portsGroup) layout(gtx C, rect image.Rectangle) {
 		}
 		pg.pos = pt
 
-		col := color.NRGBA{R: 128, G: 128, B: 128, A: 255}
+		col := gray
 		if pg.focused {
-			col = color.NRGBA{G: 128, B: 255, A: 255}
+			col = blue
 		}
 		r := float32(px(gtx, 8))
 		rr := f32.Pt(r, r)

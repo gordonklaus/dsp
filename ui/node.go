@@ -149,7 +149,7 @@ func (n *Node) Layout(gtx C) D {
 	n.drag.Add(gtx.Ops)
 
 	paint.FillShape(gtx.Ops,
-		color.NRGBA{R: 255, G: 255, B: 255, A: 255},
+		white,
 		clip.Rect(rect).Op(),
 	)
 	if n.delayColor != (color.NRGBA{}) {
@@ -166,13 +166,11 @@ func (n *Node) Layout(gtx C) D {
 	if n.editor != nil {
 		n.layoutEditor(gtx)
 	} else {
-		lbl := material.Body1(th, n.name())
-		lbl.Color = color.NRGBA{A: 255}
-		layout.N.Layout(gtx, lbl.Layout)
+		layout.N.Layout(gtx, material.Body1(th, n.name()).Layout)
 	}
 	if n.focused {
 		paint.FillShape(gtx.Ops,
-			color.NRGBA{G: 128, B: 255, A: 255},
+			blue,
 			clip.Border{
 				Rect:  layout.FRect(rect.Inset(px(gtx, -2))),
 				Width: float32(px(gtx, 4)),
@@ -203,11 +201,7 @@ func (n *Node) layoutEditor(gtx C) {
 	_, n.oldCaret = n.editor.CaretPos()
 
 	spy, gtx := eventx.Enspy(gtx)
-	th := th.WithPalette(material.Palette{
-		Fg:         color.NRGBA{A: 255},
-		ContrastBg: color.NRGBA{R: 128, G: 196, B: 196, A: 255},
-	})
-	layout.N.Layout(gtx, material.Editor(&th, n.editor, "").Layout)
+	layout.N.Layout(gtx, material.Editor(th, n.editor, "").Layout)
 
 	for _, e := range spy.AllEvents() {
 		for _, e := range e.Items {

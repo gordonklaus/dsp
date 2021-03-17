@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"image/color"
-
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/op"
@@ -175,11 +173,11 @@ func (c *Connection) Layout(gtx C) {
 		},
 	}.Op().Add(gtx.Ops)
 	if c.focused {
-		col1 := color.NRGBA{R: 0, G: 128, B: 255, A: 255}
+		col1 := blue
 		if c.editing {
-			col1 = color.NRGBA{R: 255, G: 128, B: 0, A: 255}
+			col1 = red
 		}
-		col2 := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+		col2 := white
 		if c.focusdst {
 			col1, col2 = col2, col1
 		}
@@ -190,7 +188,7 @@ func (c *Connection) Layout(gtx C) {
 			Color2: col2,
 		}.Add(gtx.Ops)
 	} else {
-		paint.ColorOp{Color: color.NRGBA{R: 255, G: 255, B: 255, A: 255}}.Add(gtx.Ops)
+		paint.ColorOp{Color: white}.Add(gtx.Ops)
 	}
 	paint.PaintOp{}.Add(gtx.Ops)
 
