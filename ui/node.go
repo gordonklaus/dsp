@@ -39,7 +39,7 @@ type Node struct {
 	inports, outports []*Port
 }
 
-const nodeWidth = 64
+const nodeWidth = 48
 
 func NewNode(node *dsp.Node, graph *Graph) *Node {
 	n := &Node{
@@ -47,13 +47,19 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 		graph: graph,
 	}
 
+	textHeight := float32(material.Body2(th, "x").Layout(C{
+		Constraints: layout.Constraints{Max: image.Pt(1000, 1000)},
+		Ops:         new(op.Ops),
+	}).Size.Y / 2 * 2)
+
 	maxPorts := len(node.InPorts)
 	if maxPorts < len(node.OutPorts) {
 		maxPorts = len(node.OutPorts)
 	}
-	n.height = 1.5 * portSize * float32(maxPorts)
+	n.height = max(textHeight, 1.5*portSize*float32(maxPorts))
+	offset := max(0, textHeight-n.height)
 
-	y := float32(.75 * portSize)
+	y := offset + float32(.75*portSize)
 	if d := maxPorts - len(node.InPorts); d > 0 {
 		y += .75 * portSize * float32(d)
 	}
@@ -62,7 +68,7 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 		y += 1.5 * portSize
 	}
 
-	y = .75 * portSize
+	y = offset + .75*portSize
 	if n.node.IsDelayWrite() {
 		y += 1.5 * portSize
 	} else if d := maxPorts - len(node.OutPorts); d > 0 {
@@ -174,7 +180,7 @@ func (n *Node) Layout(gtx C) D {
 
 func (n *Node) layoutText(gtx C) D {
 	if n.editor == nil {
-		return material.Body1(th, n.name()).Layout(gtx)
+		return material.Body2(th, n.name()).Layout(gtx)
 	}
 
 	for _, e := range n.editor.Events() {
@@ -273,4 +279,11 @@ func (n *Node) setName(name string) {
 	default:
 		n.node.Name = name
 	}
+}
+
+func max(u, v float32) float32 {
+	if u > v {
+		return u
+	}
+	return v
 }

@@ -30,7 +30,7 @@ func NewPort(port *dsp.Port, node *Node, pos f32.Point) *Port {
 	}
 }
 
-const portSize = 16
+const portSize = 12
 
 func (p *Port) Layout(gtx C) D {
 	size := image.Pt(px(gtx, portSize), px(gtx, portSize))
