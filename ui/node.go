@@ -169,12 +169,13 @@ func (n *Node) Layout(gtx C) D {
 		layout.N.Layout(gtx, material.Body1(th, n.name()).Layout)
 	}
 	if n.focused {
+		r := float32(px(gtx, 4))
 		paint.FillShape(gtx.Ops,
 			blue,
-			clip.Border{
-				Rect:  layout.FRect(rect.Inset(px(gtx, -2))),
-				Width: float32(px(gtx, 4)),
-			}.Op(gtx.Ops),
+			clip.Stroke{
+				Path:  clip.UniformRRect(layout.FRect(rect.Inset(px(gtx, -2))), r).Path(gtx.Ops),
+				Style: clip.StrokeStyle{Width: r},
+			}.Op(),
 		)
 	}
 

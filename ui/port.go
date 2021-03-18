@@ -104,11 +104,10 @@ func (p *Port) Layout(gtx C) D {
 	if p.focused {
 		paint.FillShape(gtx.Ops,
 			blue,
-			clip.Border{
-				Rect:  layout.FRect(rect),
-				Width: float32(px(gtx, 4)),
-				SE:    r, SW: r, NW: r, NE: r,
-			}.Op(gtx.Ops),
+			clip.Stroke{
+				Path:  clip.UniformRRect(layout.FRect(rect), r).Path(gtx.Ops),
+				Style: clip.StrokeStyle{Width: float32(px(gtx, 4))},
+			}.Op(),
 		)
 	}
 

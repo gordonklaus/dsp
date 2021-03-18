@@ -145,11 +145,10 @@ func (g *Graph) Layout(gtx C) D {
 	r := float32(px(gtx, 4))
 	paint.FillShape(gtx.Ops,
 		col,
-		clip.Border{
-			Rect:  layout.FRect(borderRect),
-			Width: r,
-			SE:    r, SW: r, NW: r, NE: r,
-		}.Op(gtx.Ops),
+		clip.Stroke{
+			Path:  clip.UniformRRect(layout.FRect(borderRect), r).Path(gtx.Ops),
+			Style: clip.StrokeStyle{Width: r},
+		}.Op(),
 	)
 	for _, c := range g.conns {
 		c.Layout(gtx)
@@ -286,11 +285,10 @@ func (pg *portsGroup) layout(gtx C, rect image.Rectangle) {
 		rr := f32.Pt(r, r)
 		paint.FillShape(gtx.Ops,
 			col,
-			clip.Border{
-				Rect:  f32.Rectangle{Min: pt.Sub(rr), Max: pt.Add(rr)},
-				Width: float32(px(gtx, 2)),
-				SE:    r, SW: r, NW: r, NE: r,
-			}.Op(gtx.Ops),
+			clip.Stroke{
+				Path:  clip.UniformRRect(f32.Rectangle{Min: pt.Sub(rr), Max: pt.Add(rr)}, r).Path(gtx.Ops),
+				Style: clip.StrokeStyle{Width: r},
+			}.Op(),
 		)
 	}
 
