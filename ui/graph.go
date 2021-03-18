@@ -143,8 +143,7 @@ func (g *Graph) Layout(gtx C) D {
 		col = blue
 	}
 	r := float32(px(gtx, 4))
-	paint.FillShape(gtx.Ops,
-		col,
+	paint.FillShape(gtx.Ops, col,
 		clip.Stroke{
 			Path:  clip.UniformRRect(layout.FRect(borderRect), r).Path(gtx.Ops),
 			Style: clip.StrokeStyle{Width: r},
@@ -165,7 +164,7 @@ func (g *Graph) Layout(gtx C) D {
 	return D{Size: gtx.Constraints.Min}
 }
 
-const layerGap = 128
+const layerGap = 64
 
 func (g *Graph) recordNodeLayout(gtx C) (op.CallOp, image.Rectangle) {
 	m := op.Record(gtx.Ops)
@@ -281,13 +280,13 @@ func (pg *portsGroup) layout(gtx C, rect image.Rectangle) {
 		if pg.focused {
 			col = blue
 		}
-		r := float32(px(gtx, 8))
-		rr := f32.Pt(r, r)
-		paint.FillShape(gtx.Ops,
-			col,
+		paint.FillShape(gtx.Ops, col,
 			clip.Stroke{
-				Path:  clip.UniformRRect(f32.Rectangle{Min: pt.Sub(rr), Max: pt.Add(rr)}, r).Path(gtx.Ops),
-				Style: clip.StrokeStyle{Width: r},
+				Path: clip.Circle{
+					Center: pt,
+					Radius: float32(px(gtx, 8)),
+				}.Path(gtx.Ops),
+				Style: clip.StrokeStyle{Width: float32(px(gtx, 2))},
 			}.Op(),
 		)
 	}
@@ -421,7 +420,7 @@ func (g *Graph) arrange() {
 			delayCounts[n.node.DelayWrite]++
 		}
 	}
-	hue := 0.
+	hue := 0.6
 	delayColors := map[*dsp.Node]color.NRGBA{}
 	for _, n := range g.nodes {
 		if delayCounts[n.node.DelayWrite] > 1 {

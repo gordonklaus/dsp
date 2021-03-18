@@ -34,7 +34,6 @@ const portSize = 16
 
 func (p *Port) Layout(gtx C) D {
 	size := image.Pt(px(gtx, portSize), px(gtx, portSize))
-	rect := image.Rectangle{Max: size}
 
 	for _, e := range gtx.Events(p) {
 		switch e := e.(type) {
@@ -96,16 +95,15 @@ func (p *Port) Layout(gtx C) D {
 	defer op.Save(gtx.Ops).Load()
 	op.Offset(pxpt(gtx, p.pos).Sub(layout.FPt(size).Mul(.5))).Add(gtx.Ops)
 
-	r := float32(size.X) / 2
-	paint.FillShape(gtx.Ops,
-		black,
-		clip.UniformRRect(layout.FRect(rect), r).Op(gtx.Ops),
-	)
+	circle := clip.Circle{
+		Center: layout.FPt(size).Mul(.5),
+		Radius: float32(size.X) / 2,
+	}
+	paint.FillShape(gtx.Ops, black, circle.Op(gtx.Ops))
 	if p.focused {
-		paint.FillShape(gtx.Ops,
-			blue,
+		paint.FillShape(gtx.Ops, blue,
 			clip.Stroke{
-				Path:  clip.UniformRRect(layout.FRect(rect), r).Path(gtx.Ops),
+				Path:  circle.Path(gtx.Ops),
 				Style: clip.StrokeStyle{Width: float32(px(gtx, 4))},
 			}.Op(),
 		)

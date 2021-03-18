@@ -47,17 +47,13 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 		graph: graph,
 	}
 
-	textHeight := float32(material.Body1(th, "x").Layout(C{
-		Constraints: layout.Constraints{Max: image.Pt(1000, 1000)},
-		Ops:         new(op.Ops),
-	}).Size.Y)
 	maxPorts := len(node.InPorts)
 	if maxPorts < len(node.OutPorts) {
 		maxPorts = len(node.OutPorts)
 	}
-	n.height = textHeight + 1.5*portSize*float32(maxPorts)
+	n.height = 1.5 * portSize * float32(maxPorts)
 
-	y := textHeight + float32(.75*portSize)
+	y := float32(.75 * portSize)
 	if d := maxPorts - len(node.InPorts); d > 0 {
 		y += .75 * portSize * float32(d)
 	}
@@ -66,7 +62,7 @@ func NewNode(node *dsp.Node, graph *Graph) *Node {
 		y += 1.5 * portSize
 	}
 
-	y = textHeight + .75*portSize
+	y = .75 * portSize
 	if n.node.IsDelayWrite() {
 		y += 1.5 * portSize
 	} else if d := maxPorts - len(node.OutPorts); d > 0 {
@@ -148,30 +144,20 @@ func (n *Node) Layout(gtx C) D {
 	pointer.Rect(rect).Add(gtx.Ops)
 	n.drag.Add(gtx.Ops)
 
-	paint.FillShape(gtx.Ops,
-		white,
-		clip.Rect(rect).Op(),
-	)
+	paint.FillShape(gtx.Ops, white, clip.Rect(rect).Op())
 	if n.delayColor != (color.NRGBA{}) {
-		r := float32(px(gtx, 8))
-		paint.FillShape(gtx.Ops,
-			n.delayColor,
-			clip.RRect{
-				Rect: f32.Rectangle{Max: f32.Pt(r, r)},
-				SE:   r,
+		paint.FillShape(gtx.Ops, n.delayColor,
+			clip.Circle{
+				Center: layout.FPt(size).Mul(.5),
+				Radius: float32(px(gtx, 8)),
 			}.Op(gtx.Ops),
 		)
 	}
 	gtx.Constraints.Min = size
-	if n.editor != nil {
-		n.layoutEditor(gtx)
-	} else {
-		layout.N.Layout(gtx, material.Body1(th, n.name()).Layout)
-	}
+	layout.Center.Layout(gtx, n.layoutText)
 	if n.focused {
 		r := float32(px(gtx, 4))
-		paint.FillShape(gtx.Ops,
-			blue,
+		paint.FillShape(gtx.Ops, blue,
 			clip.Stroke{
 				Path:  clip.UniformRRect(layout.FRect(rect.Inset(px(gtx, -2))), r).Path(gtx.Ops),
 				Style: clip.StrokeStyle{Width: r},
@@ -186,7 +172,11 @@ func (n *Node) Layout(gtx C) D {
 	return D{Size: size}
 }
 
-func (n *Node) layoutEditor(gtx C) {
+func (n *Node) layoutText(gtx C) D {
+	if n.editor == nil {
+		return material.Body1(th, n.name()).Layout(gtx)
+	}
+
 	for _, e := range n.editor.Events() {
 		switch e := e.(type) {
 		case widget.ChangeEvent:
@@ -196,13 +186,13 @@ func (n *Node) layoutEditor(gtx C) {
 			n.editor = nil
 			n.graph.arrange()
 			n.graph.focus = n
-			return
+			return D{}
 		}
 	}
 	_, n.oldCaret = n.editor.CaretPos()
 
 	spy, gtx := eventx.Enspy(gtx)
-	layout.N.Layout(gtx, material.Editor(th, n.editor, "").Layout)
+	dims := material.Editor(th, n.editor, "").Layout(gtx)
 
 	for _, e := range spy.AllEvents() {
 		for _, e := range e.Items {
@@ -218,6 +208,8 @@ func (n *Node) layoutEditor(gtx C) {
 			}
 		}
 	}
+
+	return dims
 }
 
 func (n *Node) edit() {
@@ -261,21 +253,24 @@ func (n *Node) validateEditor() {
 }
 
 func (n *Node) name() string {
-	if n.node.IsInport() {
+	switch {
+	case n.node.IsInport():
 		return n.node.Name[3:]
-	}
-	if n.node.IsOutport() {
+	case n.node.IsOutport():
 		return n.node.Name[4:]
+	case n.node.IsDelay():
+		return "="
 	}
 	return n.node.Name
 }
 
 func (n *Node) setName(name string) {
-	if n.node.IsInport() {
+	switch {
+	case n.node.IsInport():
 		n.node.Name = "in-" + name
-	} else if n.node.IsOutport() {
+	case n.node.IsOutport():
 		n.node.Name = "out-" + name
-	} else {
+	default:
 		n.node.Name = name
 	}
 }
