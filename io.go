@@ -197,10 +197,10 @@ func (g *Graph) Save() error {
 				delayWritten[n] = true
 			}
 			for i, p := range n.OutPorts {
-				fmt.Fprint(gof, "\t")
-				if len(p.Conns) > 0 {
-					fmt.Fprintf(gof, "%s := ", newVar(p, "v"))
+				if len(p.Conns) == 0 {
+					continue
 				}
+				fmt.Fprintf(gof, "\t%s := ", newVar(p, "v"))
 				method := "FeedbackRead"
 				if delayWritten[n.DelayWrite] {
 					method = "Read"
