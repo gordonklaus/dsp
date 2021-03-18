@@ -158,11 +158,19 @@ func (c *Connection) Layout(gtx C) {
 	if c.editing {
 		path.LineTo(pxpt(gtx, c.dstPt()))
 	} else {
-		ctrl := pxpt(gtx, f32.Pt(64, 0))
-		for _, p := range append(c.via, c.dstPt()) {
-			p = pxpt(gtx, p)
-			p2 := p.Sub(path.Pos())
-			path.Cube(ctrl, p2.Sub(ctrl), p2)
+		d := f32.Pt(nodeWidth+layerGap, 0)
+		pts := append([]f32.Point{c.srcPt().Sub(d), c.srcPt()}, append(c.via, c.dstPt(), c.dstPt().Add(d))...)
+		var ctrl1 f32.Point
+		for i := 1; i < len(pts)-1; i++ {
+			p0 := pxpt(gtx, pts[i-1])
+			p1 := pxpt(gtx, pts[i])
+			p2 := pxpt(gtx, pts[i+1])
+			d := p2.Sub(p0).Mul(1. / 6)
+			ctrl2 := p1.Sub(d)
+			if i > 1 {
+				path.CubeTo(ctrl1, ctrl2, p1)
+			}
+			ctrl1 = p1.Add(d)
 		}
 	}
 	clip.Stroke{
