@@ -75,6 +75,10 @@ func (m *Menu) initItems() {
 
 	m.items = []*menuItem{{mod: thisPkg.Module.Path}}
 	for _, req := range mod.Require {
+		if req.Mod.Path == "github.com/gordonklaus/dsp" {
+			m.expandPackage("github.com/gordonklaus/dsp/dsp")
+			continue
+		}
 		if req.Indirect {
 			continue
 		}
