@@ -139,7 +139,7 @@ func (g *Graph) Save() error {
 		fmt.Fprintf(gof, "\t%s %s\n", name, typ)
 	}
 	for _, n := range nodes {
-		if n.IsDelayWrite() {
+		if n.IsDelayWrite() || n.stateful {
 			writeField(n)
 		}
 	}
@@ -238,7 +238,9 @@ func (g *Graph) Save() error {
 		case "+", "-", "*", "/":
 			fmt.Fprintf(gof, "%s %s %s\n", getVar(n.InPorts[0]), n.Name, getVar(n.InPorts[1]))
 		default:
-			if pn, ok := pkgNames[n.Pkg]; ok {
+			if n.stateful {
+				fmt.Fprintf(gof, "this.%s.Process(", fieldNames[n])
+			} else if pn, ok := pkgNames[n.Pkg]; ok {
 				fmt.Fprintf(gof, "%s.%s(", pn, n.Name)
 			} else {
 				fmt.Fprintf(gof, "%s(", n.Name)
@@ -364,7 +366,7 @@ func newNode(pkg, name string) (*Node, error) {
 
 	if pkg != "" {
 		cfg := &packages.Config{
-			Mode: packages.NeedName | packages.NeedTypes,
+			Mode: packages.NeedTypes | packages.NeedImports, // NeedImports to work around https://github.com/golang/go/issues/45218.
 			Dir:  ".",
 		}
 		pkgs, err := packages.Load(cfg, pkg)

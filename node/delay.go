@@ -36,9 +36,9 @@ func (d *Delay) read(i int, f float32) float32 {
 		return d.ReadSample(0)
 	}
 	if i == 0 {
-		return Interp3(f, d.ReadSample(0), d.ReadSample(0), d.ReadSample(1), d.ReadSample(2))
+		return interp3(f, d.ReadSample(0), d.ReadSample(0), d.ReadSample(1), d.ReadSample(2))
 	}
-	return Interp3(f, d.ReadSample(i-1), d.ReadSample(i), d.ReadSample(i+1), d.ReadSample(i+2))
+	return interp3(f, d.ReadSample(i-1), d.ReadSample(i), d.ReadSample(i+1), d.ReadSample(i+2))
 }
 
 func (d *Delay) ReadSample(i int) float32 {
@@ -53,7 +53,7 @@ func (d *Delay) ReadSample(i int) float32 {
 }
 
 // Hermite cubic interpolation between x1 and x2 (t=0..1).
-func Interp3(t, x0, x1, x2, x3 float32) float32 {
+func interp3(t, x0, x1, x2, x3 float32) float32 {
 	c0 := x1
 	c1 := (x2 - x0) / 2
 	c2 := x0 - 2.5*x1 + 2*x2 - x3/2

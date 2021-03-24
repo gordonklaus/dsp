@@ -12,11 +12,13 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"gioui.org/x/eventx"
 	"github.com/gordonklaus/dsp"
+	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -31,16 +33,12 @@ type Menu struct {
 }
 
 type menuItem struct {
-	pkg, name string
-	obj       types.Object
+	mod, pkg, name string
+	obj            types.Object
 }
 
 func NewMenu() *Menu {
-	items := initItems()
-	return &Menu{
-		items:         items,
-		filteredItems: items,
-		selectedItem:  items[0],
+	m := &Menu{
 		editor: widget.Editor{
 			SingleLine: true,
 			Submit:     true,
@@ -49,41 +47,42 @@ func NewMenu() *Menu {
 			Axis: layout.Vertical,
 		},
 	}
+	m.initItems()
+	return m
 }
 
-func initItems() []*menuItem {
-	cfg := &packages.Config{
-		Mode: packages.NeedName,
-		Dir:  "/Users/gordon/testpkgs",
-		Env:  append(os.Environ(), "GO111MODULE=on"),
-	}
-	pkgs, err := packages.Load(cfg, "./...")
+func (m *Menu) initItems() {
+	thisPkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedModule,
+		Dir:  ".",
+	}, ".")
 	if err != nil {
 		log.Println(err)
-		return nil
-	}
-
-	cfg.Mode |= packages.NeedTypes
-	thisPkgs, err := packages.Load(cfg, ".")
-	if err != nil {
-		log.Println(err)
-		return nil
+		return
 	}
 	thisPkg := thisPkgs[0]
-
-	var items []*menuItem
-	for _, name := range thisPkg.Types.Scope().Names() {
-		if o := thisPkg.Types.Scope().Lookup(name); dsp.NewNode(o) != nil {
-			items = append(items, &menuItem{name: name, obj: o})
-		}
+	filename := thisPkg.Module.GoMod
+	bytes, err := os.ReadFile(filename)
+	if err != nil {
+		log.Println(err)
+		return
 	}
-	for _, p := range pkgs {
-		if p.ID == thisPkg.ID {
+	mod, err := modfile.Parse(filename, bytes, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	m.items = []*menuItem{{mod: thisPkg.Module.Path}}
+	for _, req := range mod.Require {
+		if req.Indirect {
 			continue
 		}
-		items = append(items, &menuItem{pkg: p.PkgPath})
+		m.items = append(m.items, &menuItem{mod: req.Mod.Path})
 	}
-	return items
+	m.sortItems()
+	m.filteredItems = m.items
+	m.selectedItem = m.items[0]
 }
 
 func (m *Menu) activate(e key.EditEvent) {
@@ -95,8 +94,7 @@ func (m *Menu) activate(e key.EditEvent) {
 func (m *Menu) filterItems() {
 	m.filteredItems = nil
 	for _, it := range m.items {
-		if strings.Contains(strings.ToLower(it.name), strings.ToLower(m.editor.Text())) ||
-			strings.Contains(strings.ToLower(it.pkg), strings.ToLower(m.editor.Text())) {
+		if strings.Contains(strings.ToLower(it.text()), strings.ToLower(m.editor.Text())) {
 			m.filteredItems = append(m.filteredItems, it)
 		} else if it == m.selectedItem {
 			m.selectedItem = nil
@@ -110,49 +108,83 @@ func (m *Menu) filterItems() {
 	}
 }
 
-func (m *Menu) expandPackage(item *menuItem) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax,
-		Dir:  "/Users/gordon/testpkgs",
-		Env:  append(os.Environ(), "GO111MODULE=on"),
-	}
-	pkgs, err := packages.Load(cfg, item.pkg)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	pkg := pkgs[0]
-
-	any := false
-	for _, name := range pkg.Types.Scope().Names() {
-		if o := pkg.Types.Scope().Lookup(name); dsp.NewNode(o) != nil {
-			it := &menuItem{pkg: o.Pkg().Name(), name: name, obj: o}
-			m.items = append(m.items, it)
-			any = true
-		}
-	}
-	if !any {
-		return
-	}
+func (m *Menu) expand(item *menuItem) {
 	for i, it := range m.items {
 		if it == item {
 			m.items = append(m.items[:i], m.items[i+1:]...)
 			break
 		}
 	}
+	m.selectedItem = nil
+
+	if item.mod != "" {
+		m.expandModule(item.mod)
+	} else {
+		m.expandPackage(item.pkg)
+	}
+
+	m.sortItems()
+	m.filterItems()
+}
+
+func (m *Menu) expandModule(name string) {
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedName,
+		Dir:  ".",
+	}, name+"/...")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if len(pkgs) == 1 {
+		m.expandPackage(pkgs[0].PkgPath)
+		return
+	}
+	for _, p := range pkgs {
+		it := &menuItem{pkg: p.PkgPath}
+		m.items = append(m.items, it)
+		if m.selectedItem == nil {
+			m.selectedItem = it
+		}
+	}
+}
+
+func (m *Menu) expandPackage(name string) {
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax,
+		Dir:  ".",
+	}, name)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	pkg := pkgs[0]
+	for _, name := range pkg.Types.Scope().Names() {
+		if o := pkg.Types.Scope().Lookup(name); o.Exported() && dsp.NewNode(o) != nil {
+			it := &menuItem{pkg: o.Pkg().Name(), name: name, obj: o}
+			m.items = append(m.items, it)
+			if m.selectedItem == nil {
+				m.selectedItem = it
+			}
+		}
+	}
+}
+
+func (m *Menu) sortItems() {
 	sort.Slice(m.items, func(i, j int) bool {
 		i1 := m.items[i]
 		i2 := m.items[j]
 		if (i1.obj == nil) != (i2.obj == nil) {
 			return i1.obj != nil
 		}
+		if i1.mod != i2.mod {
+			return i1.mod < i2.mod
+		}
 		if i1.pkg != i2.pkg {
 			return i1.pkg < i2.pkg
 		}
 		return i1.name < i2.name
 	})
-	m.filterItems()
-	m.selectedItem = m.filteredItems[0]
 }
 
 func (m *Menu) Layout(gtx C) *dsp.Node {
@@ -171,9 +203,9 @@ func (m *Menu) Layout(gtx C) *dsp.Node {
 				if m.selectedItem.obj != nil {
 					m.active = false
 					return dsp.NewNode(m.selectedItem.obj)
-				} else {
-					m.expandPackage(m.selectedItem)
 				}
+				m.expand(m.selectedItem)
+				m.editor.SetText("")
 			}
 		}
 	}
@@ -199,8 +231,8 @@ func (m *Menu) Layout(gtx C) *dsp.Node {
 					}),
 					layout.Stacked(func(gtx C) D {
 						return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx C) D {
-							gtx.Constraints.Min.X = gtx.Px(unit.Sp(256))
-							gtx.Constraints.Max.X = gtx.Px(unit.Sp(256))
+							gtx.Constraints.Min.X = gtx.Px(unit.Sp(384))
+							gtx.Constraints.Max.X = gtx.Px(unit.Sp(384))
 							gtx.Constraints.Min.Y = 0
 							gtx.Constraints.Max.Y /= 2
 							return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -250,15 +282,13 @@ func (m *Menu) layoutEditor(gtx C) D {
 }
 
 func (it *menuItem) Layout(gtx C, selected bool) D {
-	text := it.pkg
-	if it.name != "" {
-		if text != "" {
-			text += "."
-		}
-		text += it.name
-	}
-	lbl := material.Body1(th, text)
+	lbl := material.Body1(th, it.text())
 	lbl.MaxLines = 1
+	if it.mod != "" {
+		lbl.Font.Weight = text.Bold
+	} else if it.name == "" {
+		lbl.Font.Weight = text.Medium
+	}
 	if !selected {
 		return lbl.Layout(gtx)
 	}
@@ -271,6 +301,19 @@ func (it *menuItem) Layout(gtx C, selected bool) D {
 		}),
 		layout.Stacked(lbl.Layout),
 	)
+}
+
+func (it *menuItem) text() string {
+	if it.mod != "" {
+		return it.mod
+	}
+	if it.name == "" {
+		return it.pkg
+	}
+	if it.pkg == "" {
+		return it.name
+	}
+	return it.pkg + "." + it.name
 }
 
 func (m *Menu) moveSelection(next bool) {

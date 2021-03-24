@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Llongfile)
+
 	go Main()
 	app.Main()
 }

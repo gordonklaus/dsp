@@ -15,6 +15,7 @@ type Graph struct {
 
 type Node struct {
 	Pkg, Name         string
+	stateful          bool
 	InPorts, OutPorts []*Port
 	DelayWrite        *Node
 }
@@ -36,37 +37,64 @@ func NewNode(o types.Object) *Node {
 		Name: o.Name(),
 	}
 	switch o := o.(type) {
-	case *types.Func:
-		sig := o.Type().(*types.Signature)
-		params := sig.Params()
-		results := sig.Results()
-		if params.Len() == 0 || results.Len() == 0 {
+	case *types.TypeName:
+		ms := types.NewMethodSet(types.NewPointer(o.Type()))
+		ini := ms.Lookup(o.Pkg(), "Init")
+		if ini == nil {
 			return nil
 		}
-		for i := 0; i < params.Len(); i++ {
-			v := params.At(i)
-			n.InPorts = append(n.InPorts, &Port{
-				Node: n,
-				Name: v.Name()},
-			)
-			if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float32 {
-				return nil
-			}
+		sig, ok := ini.Type().(*types.Signature)
+		if !ok {
+			return nil
 		}
-		for i := 0; i < results.Len(); i++ {
-			v := results.At(i)
-			n.OutPorts = append(n.OutPorts, &Port{
-				Out:  true,
-				Node: n,
-				Name: v.Name()},
-			)
-			if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float32 {
-				return nil
-			}
+		if sig.Params().Len() != 1 || sig.Results().Len() != 0 ||
+			sig.Params().At(0).Type().String() != nodepkg+".Config" {
+			return nil
 		}
-		return n
+		proc := ms.Lookup(o.Pkg(), "Process")
+		if proc == nil {
+			return nil
+		}
+		sig, ok = proc.Type().(*types.Signature)
+		if !ok {
+			return nil
+		}
+		n.stateful = true
+		return n.init(sig)
+	case *types.Func:
+		return n.init(o.Type().(*types.Signature))
 	}
 	return nil
+}
+
+func (n *Node) init(sig *types.Signature) *Node {
+	params := sig.Params()
+	results := sig.Results()
+	if params.Len() == 0 && results.Len() == 0 {
+		return nil
+	}
+	for i := 0; i < params.Len(); i++ {
+		v := params.At(i)
+		n.InPorts = append(n.InPorts, &Port{
+			Node: n,
+			Name: v.Name()},
+		)
+		if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float32 {
+			return nil
+		}
+	}
+	for i := 0; i < results.Len(); i++ {
+		v := results.At(i)
+		n.OutPorts = append(n.OutPorts, &Port{
+			Out:  true,
+			Node: n,
+			Name: v.Name()},
+		)
+		if t, ok := v.Type().(*types.Basic); !ok || t.Kind() != types.Float32 {
+			return nil
+		}
+	}
+	return n
 }
 
 func NewPortNode(out bool) *Node {
