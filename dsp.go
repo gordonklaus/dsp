@@ -48,7 +48,7 @@ func NewNode(o types.Object) *Node {
 			return nil
 		}
 		if sig.Params().Len() != 1 || sig.Results().Len() != 0 ||
-			sig.Params().At(0).Type().String() != nodepkg+".Config" {
+			sig.Params().At(0).Type().String() != stdlib+".Config" {
 			return nil
 		}
 		proc := ms.Lookup(o.Pkg(), "Process")
@@ -118,11 +118,11 @@ func NewOperatorNode(op string) *Node {
 	return n
 }
 
-const nodepkg = "github.com/gordonklaus/dsp/node"
+const stdlib = "github.com/gordonklaus/dsp/dsp"
 
 func NewDelayNode() *Node {
 	n := &Node{
-		Pkg:  nodepkg,
+		Pkg:  stdlib,
 		Name: "Delay",
 	}
 	n.DelayWrite = n
@@ -133,7 +133,7 @@ func NewDelayNode() *Node {
 
 func NewDelayReadNode(delay *Node) *Node {
 	n := &Node{
-		Pkg:        nodepkg,
+		Pkg:        stdlib,
 		Name:       "Delay",
 		DelayWrite: delay.DelayWrite,
 	}

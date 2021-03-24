@@ -148,7 +148,7 @@ func (g *Graph) Save() error {
 	}
 
 	if len(fieldNames) > 0 {
-		fmt.Fprintf(gof, "func (this *%s) Init(c %s.Config) {\n", g.Name, pkgNames[nodepkg])
+		fmt.Fprintf(gof, "func (this *%s) Init(c %s.Config) {\n", g.Name, pkgNames[stdlib])
 		for _, n := range nodes {
 			if f, ok := fieldNames[n]; ok {
 				fmt.Fprintf(gof, "\tthis.%s.Init(c)\n", f)
@@ -360,7 +360,7 @@ func LoadGraph(name string) (*Graph, error) {
 }
 
 func newNode(pkg, name string) (*Node, error) {
-	if pkg == nodepkg && name == "Delay" {
+	if pkg == stdlib && name == "Delay" {
 		return NewDelayNode(), nil
 	}
 

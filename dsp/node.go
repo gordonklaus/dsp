@@ -1,10 +1,11 @@
-package node
+package dsp
 
 import "math/rand"
 
 // A Node processes signals.
 // In addition to Init, a Node must have a method named Process whose parameters and results are all of type float32.
 type Node interface {
+	// Init initializes a node and its children.
 	Init(Config)
 }
 
