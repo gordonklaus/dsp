@@ -1,22 +1,27 @@
-Delay:
-- special builtin
-- one Write, one or more Reads
-- named
-- add Reads from a context menu on the Write node, or by duplicating a Read node
-- Write precedes Read unless otherwise constrained
-  - visually merge Reads that succeed the Write (feedforward) into the Write node
-  - when a Read node precedes a Write, disconnect it from the Write
-- two types (or modes) of Read:  time delay and sample delay
-  - inferred by the type of the delay input:
-    - float: time
-	- int: sample
-	- no input:
-	  - feedback: single sample
-	  - feedforward: zero (pointless)
-- delay input for feedback Read should compensate for extra single sample delay by subtracting one sample period from the delay time before doing the lookup
+Labelled/identified nodes.
+- So they can be consistently referenced by Go code.
+- All stateful nodes can be labelled?
 
-Variable:
-- much like a single sample delay but for events, not audio
-  - mutiple writes allowed
-  - named
-  - of different types, perhaps? not just numeric
+Value nodes.
+- Input and Output in one node?
+
+Labelled (wireless) connections.
+
+Mathematical expression nodes.
+- Input constants as e.g. "math.Pi"; display them as symbol.
+
+Mathematical constant nodes (pi, phi, sqrt2, ...).
+- Just use math expr node?
+
+Sample rate/period nodes.
+- Just use math expr node and allow "dsp.SampleRate/Period" as a symbol?
+
+All nodes are stateful.
+- Then arbitrary float32 functions will not be mistaken as nodes.
+- Simplifies I/O.
+
+Compare float32 vs float64 performance.
+- On realistically large processing graphs.
+- On basic nodes.
+
+Multiple taps in Delay nodes.

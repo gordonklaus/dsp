@@ -2,7 +2,7 @@ package dsp
 
 import (
 	"go/types"
-	"math"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -382,94 +382,104 @@ func (g *Graph) Arrange() ([][]*Node, map[*Connection]*Connection) {
 		}
 	}
 
-	idst := func(c *Connection, l []*Node) int {
-		i := 0
+	portIndex := map[*Port]int{}
+	for _, l := range layers {
+		iin := 0
+		iout := 0
 		for _, n := range l {
 			for _, p := range n.InPorts {
-				i++
-				if p == c.Dst {
-					return i
-				}
+				portIndex[p] = iin
+				iin++
+			}
+			for _, p := range n.OutPorts {
+				portIndex[p] = iout
+				iout++
 			}
 		}
-		panic("unreached")
 	}
 
-	perms := make([][]int, len(layers))
-	for i, l := range layers {
-		perms[i] = make([]int, len(l))
+	rng := rand.New(rand.NewSource(0))
+	internalLayers := len(layers)
+	if len(g.InPorts) > 0 {
+		internalLayers--
 	}
-	bestPerms := make([][]int, len(layers))
-	for i, l := range layers {
-		bestPerms[i] = make([]int, len(l))
+	if len(g.OutPorts) > 0 {
+		internalLayers--
 	}
-	minCrossings := math.MaxInt64
-perms:
-	for {
-		crossings := 0
-		for i := range layers[:len(layers)-1] {
-			l0 := getPerm(layers[i], perms[i])
-			l1 := getPerm(layers[i+1], perms[i+1])
-			i0a := 0
-			for _, n := range l0 {
-				for _, p := range n.OutPorts {
-					i0a++
-					for _, c := range p.Conns {
-						if c2, ok := fakeConns[c]; ok {
-							c = c2
+	for i := 0; i < 1000; i++ {
+		il := rng.Intn(internalLayers)
+		if len(g.InPorts) > 0 {
+			il++
+		}
+		l := layers[il]
+		if len(l) < 2 {
+			continue
+		}
+		in0 := rng.Intn(len(l) - 1)
+		in1 := rng.Intn(len(l))
+		if in0 >= in1 {
+			in0, in1 = in1, in0+1
+		}
+		n0 := l[in0]
+		n1 := l[in1]
+		delta := 0
+		for _, p0 := range n0.InPorts {
+			for _, c0 := range p0.Conns {
+				if c, ok := fakeConns[c0]; ok {
+					c0 = c
+				}
+				src0 := portIndex[c0.Src]
+				for _, p1 := range n1.InPorts {
+					for _, c1 := range p1.Conns {
+						if c, ok := fakeConns[c1]; ok {
+							c1 = c
 						}
-						i1a := idst(c, l1)
-
-						i0b := 0
-						for _, n := range l0 {
-							for _, p := range n.OutPorts {
-								i0b++
-								for _, c := range p.Conns {
-									if c2, ok := fakeConns[c]; ok {
-										c = c2
-									}
-									i1b := idst(c, l1)
-
-									if (i0b-i0a)*(i1b-i1a) < 0 {
-										crossings++
-									}
-								}
-							}
+						src1 := portIndex[c1.Src]
+						if src0 < src1 {
+							delta++
+						} else {
+							delta--
 						}
 					}
 				}
 			}
 		}
-		if minCrossings > crossings {
-			minCrossings = crossings
-			for i, p := range perms {
-				copy(bestPerms[i], p)
+		for _, p0 := range n0.OutPorts {
+			for _, c0 := range p0.Conns {
+				if c, ok := fakeConns[c0]; ok {
+					c0 = c
+				}
+				dst0 := portIndex[c0.Dst]
+				for _, p1 := range n1.OutPorts {
+					for _, c1 := range p1.Conns {
+						if c, ok := fakeConns[c1]; ok {
+							c1 = c
+						}
+						dst1 := portIndex[c1.Dst]
+						if dst0 < dst1 {
+							delta++
+						} else {
+							delta--
+						}
+					}
+				}
 			}
 		}
-
-		for i, p := range perms {
-			if len(g.InPorts) > 0 && i == 0 {
-				continue
-			}
-
-			nextPerm(p)
-			if p[0] < len(p) {
-				break
-			}
-			perms[i] = make([]int, len(p))
-
-			lastLayer := len(perms) - 1
-			if len(g.OutPorts) > 0 {
-				lastLayer = len(perms) - 2
-			}
-			if i == lastLayer {
-				break perms
+		if delta < 0 {
+			l[in0], l[in1] = n1, n0
+			iin := 0
+			iout := 0
+			for _, n := range l {
+				for _, p := range n.InPorts {
+					portIndex[p] = iin
+					iin++
+				}
+				for _, p := range n.OutPorts {
+					portIndex[p] = iout
+					iout++
+				}
 			}
 		}
-	}
-
-	for i, p := range bestPerms {
-		layers[i] = getPerm(layers[i], p)
 	}
 
 	return layers, fakeConns
